@@ -1,3 +1,4 @@
+import { buttonStyles } from "../components/button-styles.js";
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
 import { formatDate } from "./format.js";
@@ -192,7 +193,7 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
 
                 <div class="actions">
                     <span class="unsaved">${this.#dirty ? "You have unsaved changes" : ""}</span>
-                    <uui-button look="primary" color="positive" label="Save settings" ?disabled=${this._saving || !this.#dirty || !this.#valid} @click=${this.#save}>
+                    <uui-button class="action" look="primary" color="positive" label="Save settings" ?disabled=${this._saving || !this.#dirty || !this.#valid} @click=${this.#save}>
                         Save settings
                     </uui-button>
                 </div>
@@ -200,7 +201,7 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         `;
     }
 
-    static override styles = css`
+    static override styles = [buttonStyles, css`
         :host { display: block; }
         .page { display: flex; flex-direction: column; gap: var(--uui-size-layout-1); width: 100%; }
         uui-box { --uui-box-default-padding: var(--uui-size-space-6); }
@@ -220,7 +221,7 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         .with-unit uui-input { width: 120px; }
         .actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--uui-size-space-5); }
         .unsaved { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
-    `;
+    `];
 }
 
 export default MediaGovernanceSettingsElement;

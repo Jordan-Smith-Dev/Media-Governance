@@ -56,7 +56,7 @@ public class ImageController(
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
         await fileIndex.RefreshAsync(mediaKey);   // also clears the file-request cache
         return Ok(await BuildAsync(mediaKey));
@@ -79,7 +79,7 @@ public class ImageController(
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            return BadRequest(ex.Message);
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
     }
 
@@ -140,7 +140,7 @@ public class ImageController(
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
     }
 
@@ -163,7 +163,7 @@ public class ImageController(
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
     }
 

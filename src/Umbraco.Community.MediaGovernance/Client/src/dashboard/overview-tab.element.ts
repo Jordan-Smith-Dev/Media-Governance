@@ -1,3 +1,4 @@
+import { buttonStyles } from "../components/button-styles.js";
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
 import { STATUS_LABELS, type GovernanceStatus, type OverviewItem, type OverviewPage, type Settings } from "../api/index.js";
@@ -120,12 +121,12 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                     <uui-icon name="icon-search" slot="prepend"></uui-icon>
                 </uui-input>
                 ${this._selected.size > 0
-                    ? html`<uui-button look="outline" label="Clear selection" @click=${() => (this._selected = new Set())}>Clear selection</uui-button>
-                          <uui-button look="outline" color="positive" label="Export selected" @click=${() => this.#export(true)}>
+                    ? html`<uui-button class="action" look="outline" label="Clear selection" @click=${() => (this._selected = new Set())}>Clear selection</uui-button>
+                          <uui-button class="action" look="outline" color="positive" label="Export selected" @click=${() => this.#export(true)}>
                               <uui-icon name="icon-download-alt"></uui-icon> Export selected (${this._selected.size})
                           </uui-button>`
                     : nothing}
-                <uui-button look="primary" label="Export all matching" @click=${() => this.#export(false)}>
+                <uui-button class="action" look="primary" label="Export all matching" @click=${() => this.#export(false)}>
                     <uui-icon name="icon-download-alt"></uui-icon> Export
                 </uui-button>
             </div>
@@ -136,7 +137,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                           <span class="muted">Showing</span>
                           ${this._status ? html`<uui-tag color=${STATUS_COLORS[this._status]}>${STATUS_LABELS[this._status]}</uui-tag>` : nothing}
                           ${this._filter.trim() ? html`<uui-tag look="secondary">“${this._filter.trim()}”</uui-tag>` : nothing}
-                          <uui-button compact look="secondary" label="Clear filters" @click=${this.#clearAll}>Clear filters</uui-button>
+                          <uui-button class="action" compact look="secondary" label="Clear filters" @click=${this.#clearAll}>Clear filters</uui-button>
                       </div>
                   `
                 : nothing}
@@ -221,7 +222,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
             <div class="footer">
                 <span>Showing ${this._page.items.length} of ${this._page.total}</span>
                 ${this._page.items.length < this._page.total
-                    ? html`<uui-button label="Load more" look="secondary" ?disabled=${this._loading} @click=${() => this.#load(true)}>Load more</uui-button>`
+                    ? html`<uui-button class="action" label="Load more" look="secondary" ?disabled=${this._loading} @click=${() => this.#load(true)}>Load more</uui-button>`
                     : nothing}
             </div>
             ${this._settings
@@ -230,7 +231,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         `;
     }
 
-    static override styles = css`
+    static override styles = [buttonStyles, css`
         :host { display: block; }
         .muted { color: var(--uui-color-text-alt); }
 
@@ -273,7 +274,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         .empty { display: flex; flex-direction: column; align-items: center; gap: var(--uui-size-space-3); padding: var(--uui-size-layout-2) 0; color: var(--uui-color-text-alt); }
         .empty uui-icon { font-size: 2rem; }
         @media (max-width: 1100px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
-    `;
+    `];
 }
 
 export default MediaGovernanceOverviewElement;

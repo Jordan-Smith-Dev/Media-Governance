@@ -1,3 +1,4 @@
+import { buttonStyles } from "../components/button-styles.js";
 import { css, html, customElement, property, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
@@ -100,7 +101,7 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
         return html`
             <div class="toolbar">
                 <uui-input label="Search people" placeholder="Search people..." .value=${this._query} @input=${this.#onQuery}></uui-input>
-                <uui-button look="primary" label="Add person" @click=${() => this.#edit(null)}>Add person</uui-button>
+                <uui-button class="action" look="primary" label="Add person" @click=${() => this.#edit(null)}>Add person</uui-button>
             </div>
             ${this._error ? html`<uui-tag color="danger">${this._error}</uui-tag>` : nothing} ${this.#renderForm()}
             ${this._loading
@@ -138,8 +139,8 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
                             <uui-table-cell>${p.taggedInCount} ${p.taggedInCount === 1 ? "image" : "images"}</uui-table-cell>
                             <uui-table-cell class="actions">
 <div class="action-buttons">
-                                <uui-button look="secondary" label="Edit" @click=${() => this.#edit(p)}>Edit</uui-button>
-                                <uui-button look="primary" color="danger" label="Erase" @click=${() => this.#erase(p)}>Erase</uui-button>
+                                <uui-button class="action" look="secondary" label="Edit" @click=${() => this.#edit(p)}>Edit</uui-button>
+                                <uui-button class="action" look="primary" color="danger" label="Erase" @click=${() => this.#erase(p)}>Erase</uui-button>
 </div>
 </uui-table-cell>
                         </uui-table-row>
@@ -169,14 +170,14 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
                     <umb-user-input max="1" .value=${f.linkedUserKey ?? ""} @change=${(e: Event) => this.#set("linkedUserKey", (e.target as HTMLInputElement).value ?? "")}></umb-user-input>
                 </div>
                 <div class="buttons">
-                    <uui-button look="secondary" label="Cancel" @click=${() => (this._editing = null)}>Cancel</uui-button>
-                    <uui-button look="primary" color="positive" label="Save" @click=${this.#save}>Save</uui-button>
+                    <uui-button class="action" look="secondary" label="Cancel" @click=${() => (this._editing = null)}>Cancel</uui-button>
+                    <uui-button class="action" look="primary" color="positive" label="Save" @click=${this.#save}>Save</uui-button>
                 </div>
             </uui-box>
         `;
     }
 
-    static override styles = css`
+    static override styles = [buttonStyles, css`
         :host { display: block; }
         .toolbar { display: flex; gap: var(--uui-size-space-4); margin-bottom: var(--uui-size-space-4); }
         .toolbar uui-input { flex: 1; }
@@ -186,7 +187,7 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
         .actions { white-space: nowrap; }
         .action-buttons { display: flex; align-items: center; justify-content: flex-end; gap: var(--uui-size-space-2); }
         .empty { color: var(--uui-color-text-alt); }
-    `;
+    `];
 }
 
 export default MediaGovernancePeopleElement;

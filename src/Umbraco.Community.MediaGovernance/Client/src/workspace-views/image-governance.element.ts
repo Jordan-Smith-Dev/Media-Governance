@@ -1,3 +1,4 @@
+import { buttonStyles } from "../components/button-styles.js";
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UMB_MEDIA_WORKSPACE_CONTEXT } from "@umbraco-cms/backoffice/media";
 import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
@@ -37,6 +38,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     @state() private _error = "";
     @state() private _consentForm: ConsentForm | null = null;
     @state() private _saveState: "idle" | "saving" | "saved" = "idle";
+    @state() private _preview: { url: string; type: string; name: string; broken: boolean } | null = null;
     #pending: Promise<unknown> = Promise.resolve();
     #savedTimer?: number;
     @state() private _personSearch = "";
@@ -199,10 +201,71 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
 
     async #viewEvidence(c: Consent) {
         try {
-            await this.api.viewEvidence(c.id);
+            const blob = await this.api.evidence(c.id);
+            this.#closePreview();
+            // A PDF that is not really a PDF shows as an empty frame, so check before trying to show it.
+            const broken = blob.type === "application/pdf" && (await blob.slice(0, 5).text()) !== "%PDF-";
+            this._preview = {
+                broken,
+                url: URL.createObjectURL(blob),
+                type: blob.type,
+                name: `consent-evidence-${c.id}.${blob.type === "application/pdf" ? "pdf" : blob.type === "image/png" ? "png" : "jpg"}`,
+            };
         } catch (e) {
             this.notify("danger", `Evidence could not be opened: ${errorMessage(e)}`);
         }
+    }
+
+    // uui-button ignores the download attribute, so click a real anchor instead (as the CSV export does).
+    #downloadPreview = () => {
+        const p = this._preview;
+        if (!p) return;
+        const a = document.createElement("a");
+        a.href = p.url;
+        a.download = p.name;
+        a.click();
+    };
+
+    #closePreview = () => {
+        if (this._preview) URL.revokeObjectURL(this._preview.url);
+        this._preview = null;
+    };
+
+    override updated() {
+        // Open the dialog once it has been rendered (a native dialog must be opened by script).
+        const dialog = this.shadowRoot?.querySelector<HTMLDialogElement>("dialog.preview");
+        if (dialog && !dialog.open) dialog.showModal();
+    }
+
+    override disconnectedCallback() {
+        super.disconnectedCallback();
+        this.#closePreview();
+    }
+
+    #renderPreview() {
+        const p = this._preview;
+        if (!p) return nothing;
+        return html`
+            <dialog class="preview" @close=${this.#closePreview} @click=${(e: Event) => e.target === e.currentTarget && this.#closePreview()}>
+                <div class="preview-head">
+                    <strong>Consent evidence</strong>
+                    <uui-button compact look="secondary" label="Close" @click=${this.#closePreview}><uui-icon name="icon-wrong"></uui-icon></uui-button>
+                </div>
+                <div class="preview-body">
+                    ${p.broken
+                        ? html`<p class="preview-broken">This file could not be previewed. It may be damaged. Use Download to check it, or upload a replacement.</p>`
+                        : p.type === "application/pdf"
+                          ? html`<iframe src=${p.url} title="Consent evidence (PDF)"></iframe>`
+                          : html`<img src=${p.url} alt="Consent evidence" @error=${() => (this._preview = { ...p, broken: true })} />`}
+                </div>
+                <div class="preview-foot">
+                    <span class="muted">Opening or downloading this file is recorded in the audit log.</span>
+                    <uui-button class="action" look="primary" label="Download" @click=${this.#downloadPreview}>
+                        <uui-icon name="icon-download-alt"></uui-icon> Download
+                    </uui-button>
+                </div>
+            </dialog>
+        `;
     }
 
     async #uploadEvidence(e: Event) {
@@ -392,28 +455,25 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                                       </uui-table-cell>
                                       <uui-table-cell>
                                           <div class="chips">
-                                              ${c.permittedUses.length ? c.permittedUses.map((u) => html`<uui-tag look="secondary">${u}</uui-tag>`) : "—"}
+                                              ${c.permittedUses.length ? c.permittedUses.map((u) => html`<uui-tag look="primary" color="positive">${u}</uui-tag>`) : "—"}
                                           </div>
                                       </uui-table-cell>
-                                      <uui-table-cell><uui-tag color=${status.color}>${status.label}</uui-tag></uui-table-cell>
+                                      <uui-table-cell>${status.label}</uui-table-cell>
                                       <uui-table-cell>
-                                          ${c.hasEvidence
-                                              ? html`<uui-tag color="positive">On file</uui-tag>
-                                                    <uui-button look="secondary" compact label="View evidence" @click=${() => this.#viewEvidence(c)}>
-                                                        <uui-icon name="icon-eye"></uui-icon> View
-                                                    </uui-button>`
-                                              : html`<span class="muted">None</span>`}
+                                          <div class="action-buttons evidence-buttons">
+                                              ${c.hasEvidence
+                                                  ? html`<uui-button class="action" look="primary" compact label="View evidence" @click=${() => this.#viewEvidence(c)}>View</uui-button>`
+                                                  : nothing}
+                                              <uui-button class="action" look="secondary" compact label=${c.hasEvidence ? "Replace evidence" : "Upload evidence"} @click=${() => this.#pickEvidence(c)}>
+                                                  ${c.hasEvidence ? "Replace" : "Upload"}
+                                              </uui-button>
+                                          </div>
                                       </uui-table-cell>
                                       <uui-table-cell class="actions">
-<div class="action-buttons">
-                                          <uui-button look="secondary" compact label=${c.hasEvidence ? "Replace evidence" : "Upload evidence"} @click=${() => this.#pickEvidence(c)}>
-                                              <uui-icon name="icon-attachment"></uui-icon> ${c.hasEvidence ? "Replace" : "Upload"}
-                                          </uui-button>
                                           ${c.withdrawnOn
                                               ? nothing
-                                              : html`<uui-button look="primary" color="danger" compact label="Withdraw consent" @click=${() => this.#withdraw(c)}>Withdraw</uui-button>`}
-</div>
-</uui-table-cell>
+                                              : html`<uui-button class="action" look="primary" color="danger" compact label="Withdraw consent" @click=${() => this.#withdraw(c)}>Withdraw</uui-button>`}
+                                      </uui-table-cell>
                                   </uui-table-row>
                               `;
                           })}
@@ -424,12 +484,13 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                 ? this.#renderConsentForm(this._consentForm, d.taggedPersonIds)
                 : html`
                       <div class="add-consent">
-                          <uui-button look="primary" label="Add consent" ?disabled=${!hasTags} @click=${this.#openConsentForm}>
+                          <uui-button class="action" look="primary" label="Add consent" ?disabled=${!hasTags} @click=${this.#openConsentForm}>
                               <uui-icon name="icon-add"></uui-icon> Add consent
                           </uui-button>
                           ${hasTags ? nothing : html`<span class="muted">Tag at least one person above to record their consent.</span>`}
                       </div>
                   `}
+            ${this.#renderPreview()}
         `;
     }
 
@@ -474,14 +535,14 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                     <input slot="editor" type="file" accept=".pdf,.png,.jpg,.jpeg" @change=${(e: Event) => set({ file: (e.target as HTMLInputElement).files?.[0] ?? null })} />
                 </umb-property-layout>
                 <div class="form-buttons">
-                    <uui-button look="secondary" label="Cancel" @click=${() => (this._consentForm = null)}>Cancel</uui-button>
-                    <uui-button look="primary" color="positive" label="Record consent" @click=${this.#addConsent}>Record consent</uui-button>
+                    <uui-button class="action" look="secondary" label="Cancel" @click=${() => (this._consentForm = null)}>Cancel</uui-button>
+                    <uui-button class="action" look="primary" color="positive" label="Record consent" @click=${this.#addConsent}>Record consent</uui-button>
                 </div>
             </div>
         `;
     }
 
-    static override styles = css`
+    static override styles = [buttonStyles, css`
         :host { display: flex; flex-direction: column; min-height: 100%; }
         .wrap { flex: 1; padding: var(--uui-size-layout-1); display: flex; flex-direction: column; gap: var(--uui-size-layout-1); }
         uui-box { --uui-box-default-padding: var(--uui-size-space-6) var(--uui-size-space-6); }
@@ -509,11 +570,21 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         .chips { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-2); }
         .actions { text-align: right; white-space: nowrap; }
         .action-buttons { display: flex; align-items: center; justify-content: flex-end; gap: var(--uui-size-space-2); }
+        .evidence-buttons { justify-content: flex-start; }
         .person-link { color: var(--uui-color-interactive); font-weight: 600; text-decoration: none; }
         .person-link:hover { color: var(--uui-color-interactive-emphasis); text-decoration: underline; }
         input[type="file"] { max-width: 100%; }
+        dialog.preview { width: min(900px, 92vw); max-height: 90vh; padding: 0; border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); background: var(--uui-color-surface); color: var(--uui-color-text); box-shadow: var(--uui-shadow-depth-5); }
+        dialog.preview::backdrop { background: rgba(0, 0, 0, 0.5); }
+        .preview-head, .preview-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--uui-size-space-4); padding: var(--uui-size-space-4) var(--uui-size-space-5); }
+        .preview-head { border-bottom: 1px solid var(--uui-color-border); }
+        .preview-foot { border-top: 1px solid var(--uui-color-border); }
+        .preview-body { display: flex; align-items: center; justify-content: center; background: var(--uui-color-surface-alt); min-height: 200px; max-height: 70vh; overflow: auto; }
+        .preview-body img { max-width: 100%; max-height: 70vh; object-fit: contain; }
+        .preview-broken { margin: 0; padding: var(--uui-size-space-6); text-align: center; color: var(--uui-color-text-alt); }
+        .preview-body iframe { width: 100%; height: 70vh; border: 0; }
         .save-state { margin-left: auto; color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
-    `;
+    `];
 }
 
 export default MediaGovernanceImageViewElement;

@@ -38,7 +38,7 @@ public class PeopleController(PersonService people, IImageRepository images, Med
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
     }
 
@@ -59,7 +59,7 @@ public class PeopleController(PersonService people, IImageRepository images, Med
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
     }
 
