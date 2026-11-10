@@ -1,6 +1,6 @@
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
-import { STATUS_LABELS, type AffectedPage } from "../api/index.js";
+import { STATUS_HELP, STATUS_LABELS, type AffectedPage } from "../api/index.js";
 import { STATUS_COLORS } from "./format.js";
 
 @customElement("umb-media-governance-pages")
@@ -40,6 +40,7 @@ export class MediaGovernancePagesElement extends GovernanceElement {
                       <div class="empty">
                           <uui-icon name="icon-check"></uui-icon>
                           <p>No pages use withheld images.</p>
+                          <p class="muted">Nothing needs fixing on the website right now.</p>
                       </div>
                   `
                 : html`
@@ -68,7 +69,7 @@ export class MediaGovernancePagesElement extends GovernanceElement {
                                                   (i) => html`
                                                       <a class="image" href="/umbraco/section/media/workspace/media/edit/${i.mediaKey}/invariant/view/governance">
                                                           <span>${i.name}</span>
-                                                          <uui-tag color=${STATUS_COLORS[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
+                                                          <uui-tag color=${STATUS_COLORS[i.status]} title=${STATUS_HELP[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
                                                       </a>
                                                   `
                                               )}

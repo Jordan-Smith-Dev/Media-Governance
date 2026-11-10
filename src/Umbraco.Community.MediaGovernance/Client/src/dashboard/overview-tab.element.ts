@@ -1,7 +1,7 @@
 import { buttonStyles } from "../components/button-styles.js";
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
-import { STATUS_LABELS, type GovernanceStatus, type OverviewItem, type OverviewPage, type Settings } from "../api/index.js";
+import { STATUS_HELP, STATUS_LABELS, type GovernanceStatus, type OverviewSort, type OverviewItem, type OverviewPage, type Settings } from "../api/index.js";
 import { STATUS_COLORS, formatDate, relativeDays } from "./format.js";
 
 const PAGE_SIZE = 50;
@@ -15,6 +15,8 @@ const TILES: { status: GovernanceStatus | null; label: string; hint: string; ico
     { status: "Expired", label: "Expired", hint: "Must stop being used", icon: "icon-block" },
 ];
 
+const SORTS: OverviewSort[] = ["Name", "Folder", "DateTaken", "Expiry", "Status"];
+
 @customElement("umb-media-governance-overview")
 export class MediaGovernanceOverviewElement extends GovernanceElement {
     @state() private _page?: OverviewPage;
@@ -22,6 +24,8 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
     @state() private _selected = new Set<string>();
     @state() private _status: GovernanceStatus | null = null;
     @state() private _filter = "";
+    @state() private _sort: OverviewSort = "Name";
+    @state() private _desc = false;
     @state() private _loading = true;
     @state() private _error = "";
     #debounce?: number;
@@ -29,6 +33,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
 
     override connectedCallback() {
         super.connectedCallback();
+        this.#readUrl();
         void this.#load(false);
         this.api.settings().then((s) => (this._settings = s)).catch(() => undefined);
     }
@@ -39,7 +44,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         this._error = "";
         try {
             const skip = append && this._page ? this._page.items.length : 0;
-            const page = await this.api.overview(this._status, this._filter, skip, PAGE_SIZE);
+            const page = await this.api.overview(this._status, this._filter, skip, PAGE_SIZE, this._sort, this._desc);
             if (request !== this.#request) return;
             this._page = append && this._page ? { ...page, items: [...this._page.items, ...page.items] } : page;
         } catch (e) {
@@ -49,26 +54,76 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         }
     }
 
+    // The view (status, search, sort) lives in the address, so it can be bookmarked or shared.
+    #readUrl() {
+        const q = new URLSearchParams(window.location.search);
+        const status = q.get("status") as GovernanceStatus | null;
+        if (status && status in STATUS_LABELS) this._status = status;
+        this._filter = q.get("q") ?? "";
+        const sort = q.get("sort") as OverviewSort | null;
+        if (sort && SORTS.includes(sort)) {
+            this._sort = sort;
+            this._desc = q.get("desc") === "true";
+        }
+    }
+
+    #syncUrl() {
+        const q = new URLSearchParams(window.location.search); // keeps unrelated parameters such as ?person=
+        const set = (key: string, value: string | null) => (value ? q.set(key, value) : q.delete(key));
+        set("status", this._status);
+        set("q", this._filter.trim() || null);
+        set("sort", this._sort === "Name" && !this._desc ? null : this._sort);
+        set("desc", this._desc ? "true" : null);
+        const qs = q.toString();
+        window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
+    }
+
+    #sortBy(column: OverviewSort) {
+        if (this._sort === column) this._desc = !this._desc;
+        else {
+            this._sort = column;
+            this._desc = false;
+        }
+        this.#syncUrl();
+        void this.#load(false);
+    }
+
+    #sortHeader(column: OverviewSort, label: string) {
+        const active = this._sort === column;
+        return html`<button class="sort ${active ? "active" : ""}" title=${`Sort by ${label.toLowerCase()}`} @click=${() => this.#sortBy(column)}>
+            ${label}<span class="arrow" aria-hidden="true">${active ? (this._desc ? "▼" : "▲") : "↕"}</span>
+        </button>`;
+    }
+
+    #ariaSort(column: OverviewSort) {
+        return this._sort === column ? (this._desc ? "descending" : "ascending") : "none";
+    }
+
     #selectTile(status: GovernanceStatus | null) {
         this._status = this._status === status ? null : status; // clicking the active tile clears it
+        this.#syncUrl();
         void this.#load(false);
     }
 
     #onFilter(e: Event) {
         this._filter = (e.target as HTMLInputElement).value;
         window.clearTimeout(this.#debounce);
-        this.#debounce = window.setTimeout(() => void this.#load(false), 250);
+        this.#debounce = window.setTimeout(() => {
+            this.#syncUrl();
+            void this.#load(false);
+        }, 250);
     }
 
     #clearAll() {
         this._status = null;
         this._filter = "";
+        this.#syncUrl();
         void this.#load(false);
     }
 
     async #export(selectedOnly: boolean) {
         try {
-            await this.api.exportCsv(this._status, this._filter, selectedOnly ? [...this._selected] : undefined);
+            await this.api.exportCsv(this._status, this._filter, selectedOnly ? [...this._selected] : undefined, this._sort, this._desc);
         } catch (e) {
             this.notify("danger", errorMessage(e));
         }
@@ -135,7 +190,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                 ? html`
                       <div class="active-filters">
                           <span class="muted">Showing</span>
-                          ${this._status ? html`<uui-tag color=${STATUS_COLORS[this._status]}>${STATUS_LABELS[this._status]}</uui-tag>` : nothing}
+                          ${this._status ? html`<uui-tag color=${STATUS_COLORS[this._status]} title=${STATUS_HELP[this._status]}>${STATUS_LABELS[this._status]}</uui-tag>` : nothing}
                           ${this._filter.trim() ? html`<uui-tag look="secondary">“${this._filter.trim()}”</uui-tag>` : nothing}
                           <uui-button class="action" compact look="secondary" label="Clear filters" @click=${this.#clearAll}>Clear filters</uui-button>
                       </div>
@@ -174,6 +229,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                 <div class="empty">
                     <uui-icon name="icon-search"></uui-icon>
                     <p>No images match your filters.</p>
+                    <p class="muted">Try a different status or search, or clear the filters.</p>
                 </div>
             `;
         }
@@ -181,16 +237,16 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         return html`
             <uui-table class="images">
                 <uui-table-head>
-                    <uui-table-head-cell>
+                    <uui-table-head-cell aria-sort=${this.#ariaSort("Name")}>
                         <uui-checkbox aria-label="Select all shown" .checked=${(this._page?.items.length ?? 0) > 0 && this._page!.items.every((i) => this._selected.has(i.mediaKey))} @change=${(e: Event) => this.#toggleAll((e.target as HTMLInputElement).checked)}></uui-checkbox>
-                        Name
+                        ${this.#sortHeader("Name", "Name")}
                     </uui-table-head-cell>
-                    <uui-table-head-cell>Folder</uui-table-head-cell>
+                    <uui-table-head-cell aria-sort=${this.#ariaSort("Folder")}>${this.#sortHeader("Folder", "Folder")}</uui-table-head-cell>
                     <uui-table-head-cell>People</uui-table-head-cell>
-                    <uui-table-head-cell>Date taken</uui-table-head-cell>
-                    <uui-table-head-cell>Expiry date</uui-table-head-cell>
+                    <uui-table-head-cell aria-sort=${this.#ariaSort("DateTaken")}>${this.#sortHeader("DateTaken", "Date taken")}</uui-table-head-cell>
+                    <uui-table-head-cell aria-sort=${this.#ariaSort("Expiry")}>${this.#sortHeader("Expiry", "Expiry date")}</uui-table-head-cell>
                     <uui-table-head-cell>Consent</uui-table-head-cell>
-                    <uui-table-head-cell>Status</uui-table-head-cell>
+                    <uui-table-head-cell aria-sort=${this.#ariaSort("Status")}>${this.#sortHeader("Status", "Status")}</uui-table-head-cell>
                 </uui-table-head>
                 ${this._page.items.map(
                     (i) => html`
@@ -211,7 +267,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                             <uui-table-cell>${this.#renderConsent(i)}</uui-table-cell>
                             <uui-table-cell>
                                 <div class="statuses" title=${i.issues.map((s) => STATUS_LABELS[s]).join(", ")}>
-                                    <uui-tag color=${STATUS_COLORS[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
+                                    <uui-tag color=${STATUS_COLORS[i.status]} title=${STATUS_HELP[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
                                     ${i.issues.length > 1 ? html`<uui-tag look="secondary">+${i.issues.length - 1}</uui-tag>` : nothing}
                                 </div>
                             </uui-table-cell>
@@ -259,6 +315,11 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         /* Table */
         .images uui-table-cell, .images uui-table-head-cell { padding: var(--uui-size-space-4) var(--uui-size-space-5); }
         .images uui-table-head-cell { color: var(--uui-color-text-alt); font-weight: 600; }
+        .sort { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: var(--uui-size-space-2); font-weight: 600; color: inherit; }
+        .sort:hover, .sort.active { color: var(--uui-color-interactive-emphasis); }
+        .sort:focus-visible { outline: 2px solid var(--uui-color-focus); outline-offset: 2px; border-radius: 2px; }
+        .sort .arrow { font-size: 0.75em; opacity: 0.6; }
+        .sort.active .arrow { opacity: 1; }
         .images uui-table-row:hover { background: var(--uui-color-surface-alt); }
         .images uui-table-cell { vertical-align: middle; }
         .name { color: var(--uui-color-interactive); font-weight: 600; text-decoration: none; }

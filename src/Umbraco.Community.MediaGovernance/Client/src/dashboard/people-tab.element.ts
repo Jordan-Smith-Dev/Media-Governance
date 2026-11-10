@@ -107,7 +107,7 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
             ${this._loading
                 ? html`<uui-loader></uui-loader>`
                 : this._people.length === 0
-                  ? html`<p class="empty">No people yet. People can be tagged in images once added.</p>`
+                  ? html`<p class="empty">No people yet. Use Add person, then tag them in images from each image's Governance tab.</p>`
                   : this.#renderTable()}
         `;
     }

@@ -33,7 +33,24 @@ public record GovernanceOptions(
 
 public record ImageInfo(Guid Key, string Name, string Folder);
 
-public record OverviewQuery(GovernanceStatus? Status, string? Filter, int Skip, int Take, IReadOnlyCollection<Guid>? Keys = null);
+/// <summary>Columns the overview can be sorted by. Status sorts most urgent first.</summary>
+public enum OverviewSort
+{
+    Name,
+    Folder,
+    DateTaken,
+    Expiry,
+    Status,
+}
+
+public record OverviewQuery(
+    GovernanceStatus? Status,
+    string? Filter,
+    int Skip,
+    int Take,
+    IReadOnlyCollection<Guid>? Keys = null,
+    OverviewSort Sort = OverviewSort.Name,
+    bool Descending = false);
 
 public record OverviewItem(
     Guid MediaKey,

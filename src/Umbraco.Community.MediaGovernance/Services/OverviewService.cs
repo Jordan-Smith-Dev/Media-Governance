@@ -42,11 +42,42 @@ public class OverviewService(
                 e.Facts.TaggedPersonIds.Any(p => names.TryGetValue(p, out var n) && Contains(n, f)));
         }
 
-        var ordered = filtered.OrderBy(e => e.Info.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        var ordered = Order(filtered, query.Sort, query.Descending);
         var page = ordered.Skip(Math.Max(0, query.Skip)).Take(Math.Max(0, query.Take))
             .Select(e => ToItem(e, names, today)).ToList();
 
         return new OverviewPage(counts, all.Count, page, ordered.Count);
+    }
+
+    // Most urgent first when ascending.
+    private static int Severity(GovernanceStatus status) => status switch
+    {
+        GovernanceStatus.Expired => 0,
+        GovernanceStatus.NoConsent => 1,
+        GovernanceStatus.NeedsTagging => 2,
+        GovernanceStatus.ExpiringSoon => 3,
+        _ => 4,
+    };
+
+    private static List<Evaluated> Order(IEnumerable<Evaluated> items, OverviewSort sort, bool descending)
+    {
+        var text = StringComparer.OrdinalIgnoreCase;
+
+        // Images without a date always come last, in either direction.
+        IOrderedEnumerable<Evaluated> ByDate(Func<Evaluated, DateOnly?> key) =>
+            descending
+                ? items.OrderBy(e => key(e) is null ? 1 : 0).ThenByDescending(e => key(e))
+                : items.OrderBy(e => key(e) is null ? 1 : 0).ThenBy(e => key(e));
+
+        var ordered = sort switch
+        {
+            OverviewSort.Folder => descending ? items.OrderByDescending(e => e.Info.Folder, text) : items.OrderBy(e => e.Info.Folder, text),
+            OverviewSort.DateTaken => ByDate(e => e.Facts.DateTaken),
+            OverviewSort.Expiry => ByDate(e => e.Expiry),
+            OverviewSort.Status => descending ? items.OrderByDescending(e => Severity(e.Status)) : items.OrderBy(e => Severity(e.Status)),
+            _ => descending ? items.OrderByDescending(e => e.Info.Name, text) : items.OrderBy(e => e.Info.Name, text),
+        };
+        return ordered.ThenBy(e => e.Info.Name, text).ToList();
     }
 
     /// <summary>Status per image, for the media tree indicators.</summary>

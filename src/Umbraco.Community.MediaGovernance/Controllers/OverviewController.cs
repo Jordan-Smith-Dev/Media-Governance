@@ -24,12 +24,14 @@ public class OverviewController(OverviewService overview, IBackOfficeSecurityAcc
     [ProducesResponseType(typeof(OverviewPage), StatusCodes.Status200OK)]
     public async Task<IActionResult> Get(
         [FromQuery] GovernanceStatus? status, [FromQuery] string? filter,
-        [FromQuery] int skip = 0, [FromQuery] int take = 50) =>
-        Ok(await overview.QueryAsync(new OverviewQuery(status, filter, skip, Math.Clamp(take, 1, 500))));
+        [FromQuery] int skip = 0, [FromQuery] int take = 50,
+        [FromQuery] OverviewSort sort = OverviewSort.Name, [FromQuery] bool desc = false) =>
+        Ok(await overview.QueryAsync(new OverviewQuery(status, filter, skip, Math.Clamp(take, 1, 500), null, sort, desc)));
 
     [HttpGet("overview/export")]
     [Produces("text/csv")]
-    public async Task<IActionResult> Export([FromQuery] GovernanceStatus? status, [FromQuery] string? filter, [FromQuery] string? keys = null)
+    public async Task<IActionResult> Export([FromQuery] GovernanceStatus? status, [FromQuery] string? filter, [FromQuery] string? keys = null,
+        [FromQuery] OverviewSort sort = OverviewSort.Name, [FromQuery] bool desc = false)
     {
         // keys: comma-separated media keys, used to export just the rows someone ticked
         var chosen = string.IsNullOrWhiteSpace(keys)
@@ -37,7 +39,7 @@ public class OverviewController(OverviewService overview, IBackOfficeSecurityAcc
             : keys.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(k => Guid.TryParse(k, out var g) ? g : (Guid?)null)
                 .Where(g => g is not null).Select(g => g!.Value).ToList();
-        var items = await overview.AllItemsAsync(new OverviewQuery(status, filter, 0, int.MaxValue, chosen));
+        var items = await overview.AllItemsAsync(new OverviewQuery(status, filter, 0, int.MaxValue, chosen, sort, desc));
         return File(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(ExportService.ToCsv(items))).ToArray(),
             "text/csv", "media-governance.csv");
     }

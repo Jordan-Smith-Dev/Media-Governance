@@ -4,7 +4,7 @@ import { UMB_MEDIA_WORKSPACE_CONTEXT } from "@umbraco-cms/backoffice/media";
 import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import "../components/date-input.element.js";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
-import { STATUS_LABELS, type Consent, type ImageGovernance, type Person, type Settings } from "../api/index.js";
+import { STATUS_HELP, STATUS_LABELS, type Consent, type ImageGovernance, type Person, type Settings } from "../api/index.js";
 import { GIVEN_BY_OPTIONS, STATUS_COLORS, daysUntil, formatDate, givenByLabel, relativeTime, todayIso } from "../dashboard/format.js";
 
 type ConsentForm = {
@@ -266,9 +266,9 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         const p = this._preview;
         if (!p) return nothing;
         return html`
-            <dialog class="preview" @close=${this.#closePreview} @click=${(e: Event) => e.target === e.currentTarget && this.#closePreview()}>
+            <dialog class="preview" aria-labelledby="preview-title" @close=${this.#closePreview} @click=${(e: Event) => e.target === e.currentTarget && this.#closePreview()}>
                 <div class="preview-head">
-                    <strong>Consent evidence</strong>
+                    <strong id="preview-title">Consent evidence</strong>
                     <uui-button compact look="secondary" label="Close" @click=${this.#closePreview}><uui-icon name="icon-wrong"></uui-icon></uui-button>
                 </div>
                 <div class="preview-body">
@@ -304,10 +304,10 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     }
 
     /** Status of a consent record for display: withdrawn, expired, or active (with its expiry). */
-    #consentStatus(c: Consent): { label: string; color: "positive" | "danger" | "warning" } {
-        if (c.withdrawnOn) return { label: `Withdrawn ${formatDate(c.withdrawnOn)}`, color: "danger" };
-        if (c.expiresOn && c.expiresOn <= todayIso()) return { label: `Expired ${formatDate(c.expiresOn)}`, color: "danger" };
-        return { label: c.expiresOn ? `Active until ${formatDate(c.expiresOn)}` : "Active, no expiry", color: "positive" };
+    #consentStatus(c: Consent): { label: string; color: "positive" | "danger" | "warning"; help: string } {
+        if (c.withdrawnOn) return { label: `Withdrawn ${formatDate(c.withdrawnOn)}`, color: "danger", help: "This person withdrew consent. The record is kept for the audit history." };
+        if (c.expiresOn && c.expiresOn <= todayIso()) return { label: `Expired ${formatDate(c.expiresOn)}`, color: "danger", help: "The consent has passed its end date and no longer covers use of the image." };
+        return { label: c.expiresOn ? `Active until ${formatDate(c.expiresOn)}` : "Active, no expiry", color: "positive", help: "Consent is in force for the permitted uses shown." };
     }
 
     #personName(id: string) {
@@ -326,7 +326,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                         <div class="pills">
                             ${d.issues.length === 0
                                 ? html`<uui-tag color=${STATUS_COLORS.Compliant}>${STATUS_LABELS.Compliant}</uui-tag>`
-                                : d.issues.map((s) => html`<uui-tag color=${STATUS_COLORS[s]}>${STATUS_LABELS[s]}</uui-tag>`)}
+                                : d.issues.map((s) => html`<uui-tag color=${STATUS_COLORS[s]} title=${STATUS_HELP[s]}>${STATUS_LABELS[s]}</uui-tag>`)}
                         </div>
                         <span class="save-state">
                             ${this._saveState === "saving" ? "Saving..." : this._saveState === "saved" ? "Saved" : ""}
@@ -451,7 +451,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         const hasTags = d.taggedPersonIds.length > 0;
         return html`
             ${d.consents.length === 0
-                ? html`<p class="muted">No consent recorded yet.</p>`
+                ? html`<p class="muted">No consent recorded yet. Tag the people pictured above, then use Add consent to record each person's consent.</p>`
                 : html`
                       <uui-table class="consents">
                           <uui-table-head>
@@ -478,7 +478,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                                               ${c.permittedUses.length ? c.permittedUses.map((u) => html`<uui-tag look="primary" color="positive">${u}</uui-tag>`) : "—"}
                                           </div>
                                       </uui-table-cell>
-                                      <uui-table-cell>${status.label}</uui-table-cell>
+                                      <uui-table-cell title=${status.help}>${status.label}</uui-table-cell>
                                       <uui-table-cell>
                                           <div class="action-buttons evidence-buttons">
                                               ${c.hasEvidence

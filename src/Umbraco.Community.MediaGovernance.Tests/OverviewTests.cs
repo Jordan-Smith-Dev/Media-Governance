@@ -47,6 +47,63 @@ public class OverviewServiceTests
             images, people, new FakeSettings(), new FixedTimeProvider(Today));
     }
 
+    private static string[] Names(OverviewPage page) => page.Items.Select(i => i.Name).ToArray();
+
+    [Fact]
+    public async Task Sorts_by_status_most_urgent_first()
+    {
+        var page = await Sut().QueryAsync(new OverviewQuery(null, null, 0, 50, null, OverviewSort.Status));
+        Assert.Equal(["Campus aerial", "Team offsite", "Welcome week", "Library exterior"], Names(page));
+    }
+
+    [Fact]
+    public async Task Sorts_by_status_descending_reverses_it()
+    {
+        var page = await Sut().QueryAsync(new OverviewQuery(null, null, 0, 50, null, OverviewSort.Status, true));
+        Assert.Equal(["Library exterior", "Welcome week", "Team offsite", "Campus aerial"], Names(page));
+    }
+
+    [Fact]
+    public async Task Sorts_by_expiry_with_ties_broken_by_name()
+    {
+        var asc = await Sut().QueryAsync(new OverviewQuery(null, null, 0, 50, null, OverviewSort.Expiry));
+        Assert.Equal(["Campus aerial", "Library exterior", "Team offsite", "Welcome week"], Names(asc));
+
+        var desc = await Sut().QueryAsync(new OverviewQuery(null, null, 0, 50, null, OverviewSort.Expiry, true));
+        Assert.Equal(["Library exterior", "Team offsite", "Welcome week", "Campus aerial"], Names(desc));
+    }
+
+    [Fact]
+    public async Task Sorts_by_folder_then_name()
+    {
+        var page = await Sut().QueryAsync(new OverviewQuery(null, null, 0, 50, null, OverviewSort.Folder));
+        Assert.Equal(["Campus aerial", "Library exterior", "Welcome week", "Team offsite"], Names(page));
+    }
+
+    [Fact]
+    public async Task Sorts_by_name_descending()
+    {
+        var page = await Sut().QueryAsync(new OverviewQuery(null, null, 0, 50, null, OverviewSort.Name, true));
+        Assert.Equal(["Welcome week", "Team offsite", "Library exterior", "Campus aerial"], Names(page));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Images_without_a_date_sort_last_in_either_direction(bool descending)
+    {
+        var dated = new ImageInfo(Guid.NewGuid(), "Dated", "A");
+        var undated = new ImageInfo(Guid.NewGuid(), "Undated", "A");
+        var images = new FakeImageRepository();
+        images.Facts[dated.Key] = new(dated.Key, new(2025, 1, 1), null, null, true, [], []);
+        images.Facts[undated.Key] = new(undated.Key, null, null, null, true, [], []);
+        var sut = new OverviewService(new FakeCatalog(undated, dated), images, new FakePersonRepository(), new FakeSettings(), new FixedTimeProvider(Today));
+
+        var page = await sut.QueryAsync(new OverviewQuery(null, null, 0, 50, null, OverviewSort.Expiry, descending));
+
+        Assert.Equal("Undated", page.Items[^1].Name);
+    }
+
     [Fact]
     public async Task Counts_cover_all_images_regardless_of_filter()
     {

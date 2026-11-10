@@ -12,6 +12,17 @@ export const STATUS_LABELS: Record<GovernanceStatus, string> = {
     NeedsTagging: "Needs tagging",
 };
 
+/** Plain-language meaning of each status, shown as a tooltip wherever a status appears. */
+export const STATUS_HELP: Record<GovernanceStatus, string> = {
+    Compliant: "Everything needed is in place: nobody is pictured, or everyone pictured has current consent, and the image is within its retention period.",
+    ExpiringSoon: "Still usable, but the retention period or a consent runs out within the warning window set in Settings.",
+    Expired: "The retention period has ended, or consent has run out. Do not use this image.",
+    NoConsent: "People are tagged in the image, but at least one has no current consent on file.",
+    NeedsTagging: "Nobody has been tagged yet. Tag the people pictured, or mark that the image contains no people.",
+};
+
+export type OverviewSort = "Name" | "Folder" | "DateTaken" | "Expiry" | "Status";
+
 export type ExpirySource = "None" | "Default" | "Custom" | "Consent";
 
 export type OverviewItem = {
@@ -158,15 +169,15 @@ export class GovernanceApi {
         return (await this.#request(method, path, { body })) as T;
     }
 
-    overview(status: GovernanceStatus | null, filter: string, skip: number, take: number) {
-        const q = new URLSearchParams({ skip: String(skip), take: String(take) });
+    overview(status: GovernanceStatus | null, filter: string, skip: number, take: number, sort: OverviewSort = "Name", desc = false) {
+        const q = new URLSearchParams({ skip: String(skip), take: String(take), sort, desc: String(desc) });
         if (status) q.set("status", status);
         if (filter) q.set("filter", filter);
         return this.#json<OverviewPage>("GET", `overview?${q}`);
     }
 
-    async exportCsv(status: GovernanceStatus | null, filter: string, keys?: string[]): Promise<void> {
-        const q = new URLSearchParams();
+    async exportCsv(status: GovernanceStatus | null, filter: string, keys?: string[], sort: OverviewSort = "Name", desc = false): Promise<void> {
+        const q = new URLSearchParams({ sort, desc: String(desc) });
         if (status) q.set("status", status);
         if (filter) q.set("filter", filter);
         const blob = (await this.#request("GET", `overview/export?${q}${keys?.length ? `&keys=${keys.join(",")}` : ""}`, { parseAs: "blob" })) as Blob;
