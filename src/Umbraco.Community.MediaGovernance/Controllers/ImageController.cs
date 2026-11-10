@@ -121,6 +121,22 @@ public class ImageController(
         }
     }
 
+    [HttpDelete("consent/{consentId:guid}/evidence")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveEvidence(Guid consentId)
+    {
+        try
+        {
+            await consents.RemoveEvidenceAsync(consentId, Actor);
+            return Ok();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
     [HttpPost("consent/{consentId:guid}/evidence")]
     [RequestSizeLimit(MaxUploadBytes)]
     [ProducesResponseType(StatusCodes.Status200OK)]

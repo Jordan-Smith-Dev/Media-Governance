@@ -233,6 +233,51 @@ public class ConsentServiceTests
     }
 
     [Fact]
+    public async Task RemoveEvidence_unlinks_deletes_the_file_and_audits()
+    {
+        _images.Tags[_media] = [_person];
+        var row = await Sut().AddAsync(_media, Input(), "a");
+        await Sut().AttachEvidenceAsync(row.Id, "a.pdf", File1(), "a");
+        var path = _consents.Consents[row.Id].EvidencePath;
+
+        await Sut().RemoveEvidenceAsync(row.Id, "remover-1");
+
+        Assert.Null(_consents.Consents[row.Id].EvidencePath);
+        Assert.Equal([path], _evidence.Deleted);
+        Assert.Contains(_auditRepo.Rows, r => r.Action == "consent.evidence.removed" && r.ActorKey == "remover-1");
+    }
+
+    [Fact]
+    public async Task RemoveEvidence_with_none_on_file_does_nothing()
+    {
+        _images.Tags[_media] = [_person];
+        var row = await Sut().AddAsync(_media, Input(), "a");
+
+        await Sut().RemoveEvidenceAsync(row.Id, "a");
+
+        Assert.Empty(_evidence.Deleted);
+        Assert.DoesNotContain(_auditRepo.Rows, r => r.Action == "consent.evidence.removed");
+    }
+
+    [Fact]
+    public async Task RemoveEvidence_still_unlinks_when_the_file_cannot_be_deleted()
+    {
+        _images.Tags[_media] = [_person];
+        var row = await Sut().AddAsync(_media, Input(), "a");
+        await Sut().AttachEvidenceAsync(row.Id, "a.pdf", File1(), "a");
+        _evidence.FailOnDelete = true;
+
+        await Sut().RemoveEvidenceAsync(row.Id, "a");
+
+        Assert.Null(_consents.Consents[row.Id].EvidencePath);
+        Assert.Contains(_auditRepo.Rows, r => r.Action == "consent.evidence.removed");
+    }
+
+    [Fact]
+    public async Task RemoveEvidence_unknown_consent_throws() =>
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => Sut().RemoveEvidenceAsync(Guid.NewGuid(), "a"));
+
+    [Fact]
     public async Task OpenEvidence_unknown_consent_throws() =>
         await Assert.ThrowsAsync<KeyNotFoundException>(() => Sut().OpenEvidenceAsync(Guid.NewGuid(), "a"));
 

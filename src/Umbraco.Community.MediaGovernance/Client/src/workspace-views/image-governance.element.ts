@@ -192,6 +192,26 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         }
     }
 
+    async #removeEvidence(c: Consent) {
+        try {
+            await umbConfirmModal(this, {
+                headline: `Remove the evidence for ${this.#personName(c.personId)}?`,
+                content: "The file is deleted and cannot be recovered. The consent record stays, and the removal is recorded in the audit log.",
+                color: "danger",
+                confirmLabel: "Remove evidence",
+            });
+        } catch {
+            return; // cancelled
+        }
+        try {
+            await this.api.removeEvidence(c.id);
+            this.notify("positive", "Evidence removed");
+            await this.#load();
+        } catch (e) {
+            this.notify("danger", errorMessage(e));
+        }
+    }
+
     #evidenceTarget?: Consent;
 
     #pickEvidence(c: Consent) {
@@ -467,6 +487,9 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                                               <uui-button class="action" look="secondary" compact label=${c.hasEvidence ? "Replace evidence" : "Upload evidence"} @click=${() => this.#pickEvidence(c)}>
                                                   ${c.hasEvidence ? "Replace" : "Upload"}
                                               </uui-button>
+                                              ${c.hasEvidence
+                                                  ? html`<uui-button class="action" look="secondary" color="danger" compact label="Remove evidence" @click=${() => this.#removeEvidence(c)}>Remove</uui-button>`
+                                                  : nothing}
                                           </div>
                                       </uui-table-cell>
                                       <uui-table-cell class="actions">

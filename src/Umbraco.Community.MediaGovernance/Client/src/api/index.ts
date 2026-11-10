@@ -207,6 +207,9 @@ export class GovernanceApi {
     async evidence(consentId: string): Promise<Blob> {
         return (await this.#request("GET", `consent/${consentId}/evidence`, { parseAs: "blob" })) as Blob;
     }
+    async removeEvidence(consentId: string): Promise<void> {
+        await this.#request("DELETE", `consent/${consentId}/evidence`);
+    }
     async uploadEvidence(consentId: string, file: File): Promise<void> {
         const form = new FormData();
         form.append("file", file);

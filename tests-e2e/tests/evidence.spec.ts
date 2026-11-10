@@ -49,3 +49,26 @@ test("A file that is not really a PDF is refused", async ({ page }) => {
 
     await expect(page.getByText(/contents do not match/i).first()).toBeVisible();
 });
+
+test("Remove evidence asks first, and cancelling keeps the file", async ({ page }) => {
+    await openGovernance(page, IMAGE);
+
+    await page.locator('uui-button[label="Remove evidence"]').first().click();
+    await expect(page.getByText(/Remove the evidence for/i).first()).toBeVisible();
+    await page.getByRole("button", { name: /cancel/i }).first().click();
+
+    await expect(page.getByText(/Remove the evidence for/i)).toHaveCount(0);
+    await expect(page.locator('uui-button[label="View evidence"]').first()).toBeVisible();
+});
+
+test("Withdraw asks first, and cancelling keeps the consent", async ({ page }) => {
+    await openGovernance(page, IMAGE);
+
+    const withdraw = page.locator('uui-button[label="Withdraw consent"]').first();
+    await withdraw.click();
+    await expect(page.getByText(/Withdraw consent from/i).first()).toBeVisible();
+    await page.getByRole("button", { name: /cancel/i }).first().click();
+
+    await expect(page.getByText(/Withdraw consent from/i)).toHaveCount(0);
+    await expect(withdraw).toBeVisible();
+});

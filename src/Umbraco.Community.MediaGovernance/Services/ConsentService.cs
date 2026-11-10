@@ -67,6 +67,26 @@ public class ConsentService(
         await audit.WriteAsync(actor, "consent.evidence", row.MediaKey, row.PersonId);
     }
 
+    /// <summary>Removes a consent's evidence file. Does nothing if none is on file.</summary>
+    public async Task RemoveEvidenceAsync(Guid consentId, string actor)
+    {
+        var row = await consents.GetAsync(consentId) ?? throw new KeyNotFoundException($"Consent {consentId} not found.");
+        if (row.EvidencePath is null) return;
+
+        var path = row.EvidencePath;
+        row.EvidencePath = null;
+        await consents.SaveAsync(row);   // unlink first: a leftover file is harmless, a dangling link is not
+        try
+        {
+            await evidence.DeleteAsync([path]);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The record is already unlinked; an orphaned file is removed when the person is erased.
+        }
+        await audit.WriteAsync(actor, "consent.evidence.removed", row.MediaKey, row.PersonId);
+    }
+
     /// <summary>Opens a consent's evidence for viewing, or returns null if none is on file. Each view is audited.</summary>
     public async Task<EvidenceFile?> OpenEvidenceAsync(Guid consentId, string actor)
     {
