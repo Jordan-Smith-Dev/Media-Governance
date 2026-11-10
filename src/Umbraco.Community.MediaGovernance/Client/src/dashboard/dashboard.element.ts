@@ -62,7 +62,7 @@ export class MediaGovernanceDashboardElement extends UmbLitElement {
         let node: Node | null = this;
         for (let depth = 0; node && depth < 25; depth++) {
             const parent: Node | null = node.parentNode;
-            const host = parent instanceof ShadowRoot ? parent.host : null;
+            const host: Element | null = parent instanceof ShadowRoot ? parent.host : null;
             if (host?.localName === "umb-section-main-views") {
                 const tabs = (parent as ShadowRoot).querySelector<HTMLElement>("uui-tab-group#dashboards");
                 // hide the whole header row (not just the tabs), or an empty bar is left behind

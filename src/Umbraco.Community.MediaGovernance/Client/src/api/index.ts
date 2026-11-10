@@ -203,6 +203,14 @@ export class GovernanceApi {
     async withdrawConsent(consentId: string, on: string | null): Promise<void> {
         await this.#request("POST", `consent/${consentId}/withdraw`, { body: { on } });
     }
+    /** Fetches the evidence with the backoffice credentials and opens it in a new tab. */
+    async viewEvidence(consentId: string): Promise<void> {
+        const blob = (await this.#request("GET", `consent/${consentId}/evidence`, { parseAs: "blob" })) as Blob;
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener");
+        // Give the new tab time to load it before releasing the URL.
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
     async uploadEvidence(consentId: string, file: File): Promise<void> {
         const form = new FormData();
         form.append("file", file);

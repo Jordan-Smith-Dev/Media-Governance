@@ -197,6 +197,14 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         (this.shadowRoot?.querySelector("#evidence-input") as HTMLInputElement | null)?.click();
     }
 
+    async #viewEvidence(c: Consent) {
+        try {
+            await this.api.viewEvidence(c.id);
+        } catch (e) {
+            this.notify("danger", `Evidence could not be opened: ${errorMessage(e)}`);
+        }
+    }
+
     async #uploadEvidence(e: Event) {
         const input = e.target as HTMLInputElement;
         const file = input.files?.[0];
@@ -389,7 +397,12 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                                       </uui-table-cell>
                                       <uui-table-cell><uui-tag color=${status.color}>${status.label}</uui-tag></uui-table-cell>
                                       <uui-table-cell>
-                                          ${c.hasEvidence ? html`<uui-tag color="positive">On file</uui-tag>` : html`<span class="muted">None</span>`}
+                                          ${c.hasEvidence
+                                              ? html`<uui-tag color="positive">On file</uui-tag>
+                                                    <uui-button look="secondary" compact label="View evidence" @click=${() => this.#viewEvidence(c)}>
+                                                        <uui-icon name="icon-eye"></uui-icon> View
+                                                    </uui-button>`
+                                              : html`<span class="muted">None</span>`}
                                       </uui-table-cell>
                                       <uui-table-cell class="actions">
 <div class="action-buttons">

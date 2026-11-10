@@ -73,9 +73,13 @@ internal class FakeEvidenceStore : IEvidenceStore
     public bool FailOnSave { get; set; }
     public bool FailOnDelete { get; set; }
     public string Extension { get; set; } = ".pdf";
+    public Dictionary<string, byte[]> Files { get; } = new();
 
     public Task<string> SaveAsync(Guid personId, Guid consentId, string fileName, Stream data) =>
         FailOnSave ? throw new ArgumentException("bad file") : Task.FromResult($"{personId}/{consentId}{Extension}");
+
+    public Task<Stream?> OpenReadAsync(string path) =>
+        Task.FromResult<Stream?>(Files.TryGetValue(path, out var bytes) ? new MemoryStream(bytes) : null);
 
     public Task DeleteAsync(IEnumerable<string> paths)
     {

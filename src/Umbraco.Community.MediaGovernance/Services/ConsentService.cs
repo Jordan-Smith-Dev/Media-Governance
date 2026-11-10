@@ -3,6 +3,9 @@ using Umbraco.Community.MediaGovernance.Persistence.Schema;
 
 namespace Umbraco.Community.MediaGovernance.Services;
 
+/// <summary>An evidence file ready to stream. The caller disposes <see cref="Content"/>.</summary>
+public sealed record EvidenceFile(Stream Content, string ContentType, string FileName);
+
 public class ConsentService(
     IConsentRepository consents,
     IImageRepository images,
@@ -62,5 +65,22 @@ public class ConsentService(
         if (oldPath is not null && oldPath != newPath)
             await evidence.DeleteAsync([oldPath]);
         await audit.WriteAsync(actor, "consent.evidence", row.MediaKey, row.PersonId);
+    }
+
+    /// <summary>Opens a consent's evidence for viewing, or returns null if none is on file. Each view is audited.</summary>
+    public async Task<EvidenceFile?> OpenEvidenceAsync(Guid consentId, string actor)
+    {
+        var row = await consents.GetAsync(consentId) ?? throw new KeyNotFoundException($"Consent {consentId} not found.");
+        if (row.EvidencePath is null) return null;
+
+        var extension = Path.GetExtension(row.EvidencePath);
+        var contentType = EvidenceContent.ContentTypeFor(extension);
+        if (contentType is null) return null;
+
+        var stream = await evidence.OpenReadAsync(row.EvidencePath);
+        if (stream is null) return null;
+
+        await audit.WriteAsync(actor, "consent.evidence.viewed", row.MediaKey, row.PersonId);
+        return new EvidenceFile(stream, contentType, $"consent-evidence-{row.Id}{extension.ToLowerInvariant()}");
     }
 }

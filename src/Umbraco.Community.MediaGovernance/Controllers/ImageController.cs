@@ -100,6 +100,27 @@ public class ImageController(
         }
     }
 
+    [HttpGet("consent/{consentId:guid}/evidence")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetEvidence(Guid consentId)
+    {
+        try
+        {
+            var file = await consents.OpenEvidenceAsync(consentId, Actor);
+            if (file is null) return NotFound();
+
+            // Type comes from the stored extension only; nosniff stops browsers second-guessing it.
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            Response.Headers["Cache-Control"] = "no-store";
+            return File(file.Content, file.ContentType, file.FileName);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
     [HttpPost("consent/{consentId:guid}/evidence")]
     [RequestSizeLimit(MaxUploadBytes)]
     [ProducesResponseType(StatusCodes.Status200OK)]

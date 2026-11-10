@@ -188,6 +188,55 @@ public class ConsentServiceTests
     }
 
     [Fact]
+    public async Task OpenEvidence_returns_file_with_fixed_content_type_and_audits_the_view()
+    {
+        _images.Tags[_media] = [_person];
+        var row = await Sut().AddAsync(_media, Input(), "a");
+        await Sut().AttachEvidenceAsync(row.Id, "a.pdf", File1(), "a");
+        _evidence.Files[_consents.Consents[row.Id].EvidencePath!] = [9, 8, 7];
+
+        var file = await Sut().OpenEvidenceAsync(row.Id, "viewer-1");
+
+        Assert.NotNull(file);
+        Assert.Equal("application/pdf", file!.ContentType);
+        Assert.EndsWith(".pdf", file.FileName);
+        using var copy = new MemoryStream();
+        await file.Content.CopyToAsync(copy);
+        Assert.Equal(new byte[] { 9, 8, 7 }, copy.ToArray());
+        Assert.Contains(_auditRepo.Rows, r => r.Action == "consent.evidence.viewed" && r.MediaKey == _media && r.ActorKey == "viewer-1");
+    }
+
+    [Theory]
+    [InlineData(".png", "image/png")]
+    [InlineData(".jpg", "image/jpeg")]
+    [InlineData(".jpeg", "image/jpeg")]
+    public async Task OpenEvidence_maps_extension_to_content_type(string ext, string type)
+    {
+        _images.Tags[_media] = [_person];
+        var row = await Sut().AddAsync(_media, Input(), "a");
+        _evidence.Extension = ext;
+        await Sut().AttachEvidenceAsync(row.Id, "x" + ext, File1(), "a");
+        _evidence.Files[_consents.Consents[row.Id].EvidencePath!] = [1];
+        Assert.Equal(type, (await Sut().OpenEvidenceAsync(row.Id, "a"))!.ContentType);
+    }
+
+    [Fact]
+    public async Task OpenEvidence_is_null_when_no_evidence_or_file_missing_and_does_not_audit()
+    {
+        _images.Tags[_media] = [_person];
+        var row = await Sut().AddAsync(_media, Input(), "a");
+        Assert.Null(await Sut().OpenEvidenceAsync(row.Id, "a"));              // none attached
+
+        await Sut().AttachEvidenceAsync(row.Id, "a.pdf", File1(), "a");        // attached, but file absent from store
+        Assert.Null(await Sut().OpenEvidenceAsync(row.Id, "a"));
+        Assert.DoesNotContain(_auditRepo.Rows, r => r.Action == "consent.evidence.viewed");
+    }
+
+    [Fact]
+    public async Task OpenEvidence_unknown_consent_throws() =>
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => Sut().OpenEvidenceAsync(Guid.NewGuid(), "a"));
+
+    [Fact]
     public async Task Withdraw_unknown_consent_throws() =>
         await Assert.ThrowsAsync<KeyNotFoundException>(() => Sut().WithdrawAsync(Guid.NewGuid(), new DateOnly(2026, 6, 1), "a"));
 }
@@ -230,6 +279,9 @@ public class EvidenceStoreTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "mg-evidence-" + Guid.NewGuid());
     private EvidenceStore Sut() => new(_root);
     private static MemoryStream Bytes(int n) => new(new byte[n]);
+    private static MemoryStream Pdf(int pad = 0) => new([.. "%PDF-1.4"u8, .. new byte[pad]]);
+    private static MemoryStream Png() => new([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0]);
+    private static MemoryStream Jpg() => new([0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10]);
 
     public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
 
@@ -237,7 +289,7 @@ public class EvidenceStoreTests : IDisposable
     public async Task Save_stores_under_person_folder_and_ignores_client_filename_path()
     {
         var person = Guid.NewGuid();
-        var path = await Sut().SaveAsync(person, Guid.NewGuid(), @"..\..\evil.pdf", Bytes(10));
+        var path = await Sut().SaveAsync(person, Guid.NewGuid(), @"..\..\evil.pdf", Pdf());
         var full = Path.GetFullPath(Path.Combine(_root, path));
         Assert.StartsWith(Path.GetFullPath(_root), full);
         Assert.StartsWith(person.ToString(), path);
@@ -249,21 +301,21 @@ public class EvidenceStoreTests : IDisposable
     [InlineData("form.html")]
     [InlineData("form")]
     public async Task Save_rejects_disallowed_extensions(string name) =>
-        await Assert.ThrowsAsync<ArgumentException>(() => Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), name, Bytes(10)));
+        await Assert.ThrowsAsync<ArgumentException>(() => Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), name, Pdf()));
 
     [Fact]
     public async Task Save_rejects_files_over_10MB() =>
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "big.pdf", Bytes(10 * 1024 * 1024 + 1)));
+            Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "big.pdf", Pdf(10 * 1024 * 1024)));
 
     [Fact]
     public async Task DeleteForPerson_removes_the_whole_folder_and_nothing_else()
     {
         var sut = Sut();
         var person = Guid.NewGuid();
-        await sut.SaveAsync(person, Guid.NewGuid(), "a.pdf", Bytes(5));
-        await sut.SaveAsync(person, Guid.NewGuid(), "b.png", Bytes(5));
-        var other = await sut.SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "c.pdf", Bytes(5));
+        await sut.SaveAsync(person, Guid.NewGuid(), "a.pdf", Pdf());
+        await sut.SaveAsync(person, Guid.NewGuid(), "b.png", Png());
+        var other = await sut.SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "c.pdf", Pdf());
 
         await sut.DeleteForPersonAsync(person);
 
@@ -275,7 +327,7 @@ public class EvidenceStoreTests : IDisposable
     public async Task Delete_removes_files_and_ignores_paths_outside_root()
     {
         var sut = Sut();
-        var path = await sut.SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "a.pdf", Bytes(5));
+        var path = await sut.SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "a.pdf", Pdf());
         var outside = Path.Combine(Path.GetTempPath(), "mg-outside-" + Guid.NewGuid() + ".txt");
         await File.WriteAllTextAsync(outside, "keep me", Encoding.UTF8);
 
@@ -285,4 +337,67 @@ public class EvidenceStoreTests : IDisposable
         Assert.True(File.Exists(outside));
         File.Delete(outside);
     }
+
+    [Theory]
+    [InlineData("form.pdf")]
+    [InlineData("form.png")]
+    [InlineData("form.jpg")]
+    public async Task Save_rejects_content_that_does_not_match_the_extension(string name)
+    {
+        var html = new MemoryStream("<html><script>alert(1)</script></html>"u8.ToArray());
+        await Assert.ThrowsAsync<ArgumentException>(() => Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), name, html));
+    }
+
+    [Fact]
+    public async Task Save_rejects_a_real_png_named_as_pdf() =>
+        await Assert.ThrowsAsync<ArgumentException>(() => Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "x.pdf", Png()));
+
+    [Theory]
+    [InlineData("x.jpeg")]
+    [InlineData("X.JPG")]
+    public async Task Save_accepts_jpeg_content_under_either_jpeg_extension(string name) =>
+        Assert.NotNull(await Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), name, Jpg()));
+
+    [Fact]
+    public async Task Save_rejection_message_does_not_leak_parameter_names()
+    {
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "x.exe", Pdf()));
+        Assert.DoesNotContain("Parameter", ex.Message);
+    }
+
+    [Fact]
+    public async Task Stored_paths_use_forward_slashes()
+    {
+        var path = await Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "a.pdf", Pdf());
+        Assert.DoesNotContain('\\', path);
+        Assert.Contains('/', path);
+    }
+
+    [Fact]
+    public async Task OpenRead_returns_what_was_saved()
+    {
+        var sut = Sut();
+        var path = await sut.SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "a.png", Png());
+        await using var stream = await sut.OpenReadAsync(path);
+        Assert.NotNull(stream);
+        using var copy = new MemoryStream();
+        await stream!.CopyToAsync(copy);
+        Assert.Equal(Png().ToArray(), copy.ToArray());
+    }
+
+    [Fact]
+    public async Task OpenRead_still_resolves_legacy_backslash_paths()
+    {
+        var sut = Sut();
+        var path = await sut.SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "a.pdf", Pdf());
+        await using var stream = await sut.OpenReadAsync(path.Replace('/', '\\'));
+        Assert.NotNull(stream);
+    }
+
+    [Theory]
+    [InlineData("missing/file.pdf")]
+    [InlineData("../outside.pdf")]
+    [InlineData(@"..\outside.pdf")]
+    public async Task OpenRead_returns_null_for_missing_or_outside_paths(string path) =>
+        Assert.Null(await Sut().OpenReadAsync(path));
 }
