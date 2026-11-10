@@ -4,8 +4,8 @@ import { UMB_MEDIA_WORKSPACE_CONTEXT } from "@umbraco-cms/backoffice/media";
 import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import "../components/date-input.element.js";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
-import { STATUS_HELP, STATUS_LABELS, type Consent, type ImageGovernance, type Person, type Settings } from "../api/index.js";
-import { GIVEN_BY_OPTIONS, STATUS_COLORS, daysUntil, formatDate, givenByLabel, relativeTime, todayIso } from "../dashboard/format.js";
+import { STATUS_HELP, STATUS_LABELS, type Consent, type EvidenceEvent, type ImageGovernance, type Person, type Settings } from "../api/index.js";
+import { GIVEN_BY_OPTIONS, STATUS_COLORS, daysUntil, formatBytes, formatDate, givenByLabel, relativeTime, todayIso } from "../dashboard/format.js";
 
 type ConsentForm = {
     personId: string;
@@ -39,6 +39,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     @state() private _consentForm: ConsentForm | null = null;
     @state() private _saveState: "idle" | "saving" | "saved" = "idle";
     @state() private _preview: { url: string; type: string; name: string; broken: boolean } | null = null;
+    @state() private _history: { person: string; events: EvidenceEvent[] } | null = null;
     #pending: Promise<unknown> = Promise.resolve();
     #savedTimer?: number;
     @state() private _personSearch = "";
@@ -252,9 +253,62 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     };
 
     override updated() {
-        // Open the dialog once it has been rendered (a native dialog must be opened by script).
-        const dialog = this.shadowRoot?.querySelector<HTMLDialogElement>("dialog.preview");
-        if (dialog && !dialog.open) dialog.showModal();
+        // Open dialogs once they have been rendered (a native dialog must be opened by script).
+        this.shadowRoot?.querySelectorAll<HTMLDialogElement>("dialog[data-modal]").forEach((d) => {
+            if (!d.open) d.showModal();
+        });
+    }
+
+    async #showHistory(c: Consent) {
+        try {
+            this._history = { person: this.#personName(c.personId), events: await this.api.evidenceHistory(c.id) };
+        } catch (e) {
+            this.notify("danger", `History could not be loaded: ${errorMessage(e)}`);
+        }
+    }
+
+    #closeHistory = () => {
+        this._history = null;
+    };
+
+    #renderHistory() {
+        const h = this._history;
+        if (!h) return nothing;
+        const label: Record<string, string> = {
+            "consent.evidence": "Uploaded",
+            "consent.evidence.viewed": "Viewed",
+            "consent.evidence.removed": "Removed",
+        };
+        return html`
+            <dialog class="preview history" data-modal aria-labelledby="history-title" @close=${this.#closeHistory} @click=${(e: Event) => e.target === e.currentTarget && this.#closeHistory()}>
+                <div class="preview-head">
+                    <strong id="history-title">Evidence history for ${h.person}</strong>
+                    <uui-button compact look="secondary" label="Close" @click=${this.#closeHistory}><uui-icon name="icon-wrong"></uui-icon></uui-button>
+                </div>
+                <div class="history-body">
+                    ${h.events.length === 0
+                        ? html`<p class="muted">Nothing has happened to this evidence yet.</p>`
+                        : html`<uui-table>
+                              <uui-table-head>
+                                  <uui-table-head-cell>What</uui-table-head-cell>
+                                  <uui-table-head-cell>Who</uui-table-head-cell>
+                                  <uui-table-head-cell>When</uui-table-head-cell>
+                              </uui-table-head>
+                              ${h.events.map(
+                                  (e) => html`<uui-table-row>
+                                      <uui-table-cell>${label[e.action] ?? e.action}</uui-table-cell>
+                                      <uui-table-cell>${e.actor}</uui-table-cell>
+                                      <uui-table-cell>${new Date(e.whenUtc).toLocaleString()}</uui-table-cell>
+                                  </uui-table-row>`
+                              )}
+                          </uui-table>`}
+                </div>
+                <div class="preview-foot">
+                    <span class="muted">Covers this person on this image. Viewing is recorded each time.</span>
+                    <uui-button class="action" look="secondary" label="Close" @click=${this.#closeHistory}>Close</uui-button>
+                </div>
+            </dialog>
+        `;
     }
 
     override disconnectedCallback() {
@@ -266,7 +320,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         const p = this._preview;
         if (!p) return nothing;
         return html`
-            <dialog class="preview" aria-labelledby="preview-title" @close=${this.#closePreview} @click=${(e: Event) => e.target === e.currentTarget && this.#closePreview()}>
+            <dialog class="preview" data-modal aria-labelledby="preview-title" @close=${this.#closePreview} @click=${(e: Event) => e.target === e.currentTarget && this.#closePreview()}>
                 <div class="preview-head">
                     <strong id="preview-title">Consent evidence</strong>
                     <uui-button compact look="secondary" label="Close" @click=${this.#closePreview}><uui-icon name="icon-wrong"></uui-icon></uui-button>
@@ -480,6 +534,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                                       </uui-table-cell>
                                       <uui-table-cell title=${status.help}>${status.label}</uui-table-cell>
                                       <uui-table-cell>
+                                          <div class="evidence-cell">
                                           <div class="action-buttons evidence-buttons">
                                               ${c.hasEvidence
                                                   ? html`<uui-button class="action" look="primary" compact label="View evidence" @click=${() => this.#viewEvidence(c)}>View</uui-button>`
@@ -490,6 +545,13 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                                               ${c.hasEvidence
                                                   ? html`<uui-button class="action" look="secondary" color="danger" compact label="Remove evidence" @click=${() => this.#removeEvidence(c)}>Remove</uui-button>`
                                                   : nothing}
+                                          </div>
+                                          ${c.hasEvidence
+                                              ? html`<div class="evidence-meta muted">
+                                                    ${[c.evidenceType, c.evidenceSizeBytes != null ? formatBytes(c.evidenceSizeBytes) : "file missing"].filter(Boolean).join(" · ")}
+                                                    · <button class="link" @click=${() => this.#showHistory(c)}>History</button>
+                                                </div>`
+                                              : nothing}
                                           </div>
                                       </uui-table-cell>
                                       <uui-table-cell class="actions">
@@ -513,7 +575,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                           ${hasTags ? nothing : html`<span class="muted">Tag at least one person above to record their consent.</span>`}
                       </div>
                   `}
-            ${this.#renderPreview()}
+            ${this.#renderPreview()} ${this.#renderHistory()}
         `;
     }
 
@@ -594,6 +656,12 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         .actions { text-align: right; white-space: nowrap; }
         .action-buttons { display: flex; align-items: center; justify-content: flex-end; gap: var(--uui-size-space-2); }
         .evidence-buttons { justify-content: flex-start; }
+        .evidence-cell { display: flex; flex-direction: column; gap: var(--uui-size-space-2); }
+        .evidence-meta { white-space: nowrap; }
+        button.link { all: unset; cursor: pointer; color: var(--uui-color-interactive); text-decoration: underline; }
+        button.link:hover { color: var(--uui-color-interactive-emphasis); }
+        button.link:focus-visible { outline: 2px solid var(--uui-color-focus); outline-offset: 2px; }
+        .history-body { padding: var(--uui-size-space-4) var(--uui-size-space-5); max-height: 60vh; overflow: auto; }
         .person-link { color: var(--uui-color-interactive); font-weight: 600; text-decoration: none; }
         .person-link:hover { color: var(--uui-color-interactive-emphasis); text-decoration: underline; }
         input[type="file"] { max-width: 100%; }

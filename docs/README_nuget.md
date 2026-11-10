@@ -107,12 +107,14 @@ The package creates its own tables (`mgPerson`, `mgImage`, `mgImagePerson`, `mgC
 ## Notes
 
 - Evidence files are stored under `umbraco/Data/MediaGovernance/evidence` (outside `wwwroot`, never served directly).
+- Evidence can be viewed, downloaded, replaced or removed from an image's *Governance* tab, which also shows its type and size. Uploads are checked against the PDF, PNG and JPG file signatures, not just the extension. Each upload, view and removal is recorded in the audit log, and the *History* link shows who did what and when.
+- The overview can be sorted by any date, name, folder or status column. The status, search and sort are kept in the address, so a view can be bookmarked or shared.
 - Notifications use Umbraco's configured email settings and run on the scheduling server only.
 - The People list lives in the dashboard's *People* tab.
 
 ## Known limitations
 
-- **Evidence storage is local disk.** Files live under `umbraco/Data/MediaGovernance/evidence` on the server that received them. On load-balanced or scaled-out hosts, point that folder at shared storage, otherwise erasure on one server cannot remove files held by another.
+- **Evidence storage is local disk.** Files live under `umbraco/Data/MediaGovernance/evidence` on the server that received them. That is fine for a single server. On load-balanced or scaled-out hosts, or anywhere the disk is not persistent (containers, some cloud plans), point that folder at shared, persistent storage, otherwise evidence can go missing and erasure on one server cannot remove files held by another. A blob storage option is planned.
 - **Access follows Media section access.** Any user with access to the Media section can see governance data for all images, including people's names and consent records. Media start nodes are not applied.
 
 ## Roadmap

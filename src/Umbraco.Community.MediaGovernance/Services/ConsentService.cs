@@ -3,6 +3,12 @@ using Umbraco.Community.MediaGovernance.Persistence.Schema;
 
 namespace Umbraco.Community.MediaGovernance.Services;
 
+/// <summary>What is on file for a consent, for display: the type and size of the evidence.</summary>
+public sealed record EvidenceInfo(string Type, long? SizeBytes);
+
+/// <summary>One thing that happened to a consent's evidence. The actor is a raw key; resolve it to a name for display.</summary>
+public sealed record EvidenceEvent(string Action, DateTime WhenUtc, string ActorKey);
+
 /// <summary>An evidence file ready to stream. The caller disposes <see cref="Content"/>.</summary>
 public sealed record EvidenceFile(Stream Content, string ContentType, string FileName);
 
@@ -65,6 +71,34 @@ public class ConsentService(
         if (oldPath is not null && oldPath != newPath)
             await evidence.DeleteAsync([oldPath]);
         await audit.WriteAsync(actor, "consent.evidence", row.MediaKey, row.PersonId);
+    }
+
+    /// <summary>Type and size of the evidence for each consent that has some, keyed by consent id.</summary>
+    public async Task<IReadOnlyDictionary<Guid, EvidenceInfo>> EvidenceInfoAsync(IEnumerable<ConsentRow> rows)
+    {
+        var result = new Dictionary<Guid, EvidenceInfo>();
+        foreach (var row in rows.Where(r => r.EvidencePath is not null))
+        {
+            var type = Path.GetExtension(row.EvidencePath!).ToLowerInvariant() switch
+            {
+                ".pdf" => "PDF",
+                ".png" => "PNG",
+                ".jpg" or ".jpeg" => "JPG",
+                _ => "File",
+            };
+            result[row.Id] = new EvidenceInfo(type, await evidence.GetSizeAsync(row.EvidencePath!));
+        }
+        return result;
+    }
+
+    private static readonly string[] EvidenceActions = ["consent.evidence", "consent.evidence.viewed", "consent.evidence.removed"];
+
+    /// <summary>Uploads, views and removals of evidence for this consent's person on this image, newest first.</summary>
+    public async Task<IReadOnlyList<EvidenceEvent>> EvidenceHistoryAsync(Guid consentId, int take = 50)
+    {
+        var row = await consents.GetAsync(consentId) ?? throw new KeyNotFoundException($"Consent {consentId} not found.");
+        var entries = await audit.ListForAsync(row.MediaKey, row.PersonId, EvidenceActions, take);
+        return entries.Select(e => new EvidenceEvent(e.Action, e.WhenUtc, e.ActorKey)).ToList();
     }
 
     /// <summary>Removes a consent's evidence file. Does nothing if none is on file.</summary>

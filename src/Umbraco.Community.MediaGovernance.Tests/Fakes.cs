@@ -64,6 +64,11 @@ internal class FakeAuditRepository : IAuditRepository
     public List<AuditRow> Rows { get; } = new();
     public Task WriteAsync(AuditRow row) { Rows.Add(row); return Task.CompletedTask; }
     public Task<IReadOnlyList<AuditRow>> ListAsync(int take) => Task.FromResult<IReadOnlyList<AuditRow>>(Rows);
+
+    public Task<IReadOnlyList<AuditRow>> ListForAsync(Guid mediaKey, Guid personId, IReadOnlyCollection<string> actions, int take) =>
+        Task.FromResult<IReadOnlyList<AuditRow>>(Rows
+            .Where(r => r.MediaKey == mediaKey && r.PersonId == personId && actions.Contains(r.Action))
+            .Reverse().Take(take).ToList());
 }
 
 internal class FakeEvidenceStore : IEvidenceStore
@@ -80,6 +85,9 @@ internal class FakeEvidenceStore : IEvidenceStore
 
     public Task<Stream?> OpenReadAsync(string path) =>
         Task.FromResult<Stream?>(Files.TryGetValue(path, out var bytes) ? new MemoryStream(bytes) : null);
+
+    public Task<long?> GetSizeAsync(string path) =>
+        Task.FromResult(Files.TryGetValue(path, out var bytes) ? (long?)bytes.Length : null);
 
     public Task DeleteAsync(IEnumerable<string> paths)
     {

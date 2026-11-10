@@ -70,7 +70,11 @@ export type Consent = {
     withdrawnOn: string | null;
     hasEvidence: boolean;
     notes: string | null;
+    evidenceType?: string | null;
+    evidenceSizeBytes?: number | null;
 };
+
+export type EvidenceEvent = { action: string; whenUtc: string; actor: string };
 
 export type ConsentRequest = {
     personId: string;
@@ -217,6 +221,9 @@ export class GovernanceApi {
     /** Fetches a consent's evidence with the backoffice credentials. Each call is audited as a view. */
     async evidence(consentId: string): Promise<Blob> {
         return (await this.#request("GET", `consent/${consentId}/evidence`, { parseAs: "blob" })) as Blob;
+    }
+    evidenceHistory(consentId: string) {
+        return this.#json<EvidenceEvent[]>("GET", `consent/${consentId}/evidence/history`);
     }
     async removeEvidence(consentId: string): Promise<void> {
         await this.#request("DELETE", `consent/${consentId}/evidence`);

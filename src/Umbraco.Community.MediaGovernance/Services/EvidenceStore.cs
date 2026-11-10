@@ -8,6 +8,9 @@ public interface IEvidenceStore
     /// <summary>Opens a stored file for reading, or returns null if it is missing or the path resolves outside the store.</summary>
     Task<Stream?> OpenReadAsync(string path);
 
+    /// <summary>Size in bytes of a stored file, or null if it is missing or the path resolves outside the store.</summary>
+    Task<long?> GetSizeAsync(string path);
+
     /// <summary>Deletes stored files by relative path. Paths that resolve outside the store root are ignored.</summary>
     Task DeleteAsync(IEnumerable<string> paths);
 
@@ -85,6 +88,12 @@ public class EvidenceStore(string rootPath) : IEvidenceStore
         return Task.FromResult<Stream?>(full is not null && File.Exists(full)
             ? new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true)
             : null);
+    }
+
+    public Task<long?> GetSizeAsync(string path)
+    {
+        var full = Resolve(path);
+        return Task.FromResult(full is not null && File.Exists(full) ? new FileInfo(full).Length : (long?)null);
     }
 
     public Task DeleteAsync(IEnumerable<string> paths)

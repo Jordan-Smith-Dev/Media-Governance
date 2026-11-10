@@ -278,6 +278,65 @@ public class ConsentServiceTests
         await Assert.ThrowsAsync<KeyNotFoundException>(() => Sut().RemoveEvidenceAsync(Guid.NewGuid(), "a"));
 
     [Fact]
+    public async Task EvidenceInfo_reports_type_and_size_for_consents_with_evidence_only()
+    {
+        _images.Tags[_media] = [_person];
+        var withFile = await Sut().AddAsync(_media, Input(), "a");
+        var without = await Sut().AddAsync(_media, Input(), "a");
+        await Sut().AttachEvidenceAsync(withFile.Id, "a.pdf", File1(), "a");
+        _evidence.Files[_consents.Consents[withFile.Id].EvidencePath!] = new byte[2048];
+
+        var info = await Sut().EvidenceInfoAsync([_consents.Consents[withFile.Id], _consents.Consents[without.Id]]);
+
+        Assert.Equal(new EvidenceInfo("PDF", 2048), info[withFile.Id]);
+        Assert.False(info.ContainsKey(without.Id));
+    }
+
+    [Fact]
+    public async Task EvidenceInfo_size_is_null_when_the_file_is_missing()
+    {
+        _images.Tags[_media] = [_person];
+        var row = await Sut().AddAsync(_media, Input(), "a");
+        await Sut().AttachEvidenceAsync(row.Id, "a.pdf", File1(), "a");   // no bytes in the fake store
+
+        var info = await Sut().EvidenceInfoAsync([_consents.Consents[row.Id]]);
+
+        Assert.Null(info[row.Id].SizeBytes);
+    }
+
+    [Fact]
+    public async Task EvidenceHistory_lists_uploads_views_and_removals_newest_first_and_ignores_other_entries()
+    {
+        _images.Tags[_media] = [_person];
+        var row = await Sut().AddAsync(_media, Input(), "a");            // consent.added: not evidence history
+        await Sut().AttachEvidenceAsync(row.Id, "a.pdf", File1(), "uploader");
+        _evidence.Files[_consents.Consents[row.Id].EvidencePath!] = [1];
+        await Sut().OpenEvidenceAsync(row.Id, "viewer");
+        await Sut().RemoveEvidenceAsync(row.Id, "remover");
+
+        var history = await Sut().EvidenceHistoryAsync(row.Id);
+
+        Assert.Equal(["consent.evidence.removed", "consent.evidence.viewed", "consent.evidence"], history.Select(h => h.Action).ToArray());
+        Assert.Equal(["remover", "viewer", "uploader"], history.Select(h => h.ActorKey).ToArray());
+    }
+
+    [Fact]
+    public async Task EvidenceHistory_excludes_other_people_on_the_same_image()
+    {
+        var other = Guid.NewGuid();
+        _images.Tags[_media] = [_person, other];
+        var mine = await Sut().AddAsync(_media, Input(), "a");
+        var theirs = await Sut().AddAsync(_media, Input() with { PersonId = other }, "a");
+        await Sut().AttachEvidenceAsync(theirs.Id, "a.pdf", File1(), "someone-else");
+
+        Assert.Empty(await Sut().EvidenceHistoryAsync(mine.Id));
+    }
+
+    [Fact]
+    public async Task EvidenceHistory_unknown_consent_throws() =>
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => Sut().EvidenceHistoryAsync(Guid.NewGuid()));
+
+    [Fact]
     public async Task OpenEvidence_unknown_consent_throws() =>
         await Assert.ThrowsAsync<KeyNotFoundException>(() => Sut().OpenEvidenceAsync(Guid.NewGuid(), "a"));
 
@@ -416,6 +475,17 @@ public class EvidenceStoreTests : IDisposable
         var path = await Sut().SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "a.pdf", Pdf());
         Assert.DoesNotContain('\\', path);
         Assert.Contains('/', path);
+    }
+
+    [Fact]
+    public async Task GetSize_returns_the_stored_length_and_null_for_missing_or_outside_paths()
+    {
+        var sut = Sut();
+        var path = await sut.SaveAsync(Guid.NewGuid(), Guid.NewGuid(), "a.png", Png());
+
+        Assert.Equal(Png().Length, await sut.GetSizeAsync(path));
+        Assert.Null(await sut.GetSizeAsync("missing/file.png"));
+        Assert.Null(await sut.GetSizeAsync("../outside.png"));
     }
 
     [Fact]

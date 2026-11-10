@@ -8,6 +8,13 @@ export const STATUS_COLORS: Record<GovernanceStatus, "positive" | "warning" | "d
     NeedsTagging: "warning",
 };
 
+/** 1843200 -> "1.8 MB". */
+export function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 /** "2026-10-29" -> "29 October 2026" (date-only values are parsed as local, never shifted by timezone). */
 export function formatDate(iso: string | null): string {
     if (!iso) return "—";

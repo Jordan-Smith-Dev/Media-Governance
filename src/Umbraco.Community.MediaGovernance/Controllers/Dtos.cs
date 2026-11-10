@@ -15,7 +15,11 @@ public record ConsentDto(
     DateOnly? ExpiresOn,
     DateOnly? WithdrawnOn,
     bool HasEvidence,
-    string? Notes);
+    string? Notes,
+    string? EvidenceType = null,
+    long? EvidenceSizeBytes = null);
+
+public record EvidenceEventDto(string Action, DateTime WhenUtc, string Actor);
 
 public record ConsentRequest(
     Guid PersonId,

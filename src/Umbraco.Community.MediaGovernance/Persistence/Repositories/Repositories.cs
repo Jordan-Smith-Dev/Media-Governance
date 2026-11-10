@@ -223,6 +223,16 @@ public class AuditRepository(IScopeProvider scopeProvider) : IAuditRepository
         var rows = scope.Database.Fetch<AuditRow>($"SELECT * FROM {TableNames.Audit} ORDER BY Id DESC");
         return rows.Take(take).ToList();
     }
+
+    public async Task<IReadOnlyList<AuditRow>> ListForAsync(Guid mediaKey, Guid personId, IReadOnlyCollection<string> actions, int take)
+    {
+        if (actions.Count == 0) return [];
+        using var scope = scopeProvider.CreateScope(autoComplete: true);
+        var rows = scope.Database.Fetch<AuditRow>(
+            $"SELECT * FROM {TableNames.Audit} WHERE MediaKey = @0 AND PersonId = @1 AND Action IN (@2) ORDER BY Id DESC",
+            mediaKey, personId, actions.ToArray());
+        return rows.Take(take).ToList();
+    }
 }
 
 public class NotifiedRepository(IScopeProvider scopeProvider) : INotifiedRepository

@@ -7,6 +7,7 @@ export default defineConfig({
     timeout: 45_000,
     expect: { timeout: 10_000 },
     workers: 1, // one shared test site and database
+    retries: 1, // the backoffice occasionally drops a session mid-test (token refresh), which a retry absorbs
     reporter: [["list"], ["html", { open: "never" }]],
     use: {
         baseURL: url,

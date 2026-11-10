@@ -29,6 +29,7 @@ public class ImageController(
     ImageCatalog catalog,
     IMediaUploadDates uploads,
     TimeProvider time,
+    Umbraco.Cms.Core.Services.IUserService users,
     IBackOfficeSecurityAccessor security) : GovernanceControllerBase(security)
 {
     private const long MaxUploadBytes = EvidenceStore.MaxBytes + 1024;
@@ -75,7 +76,7 @@ public class ImageController(
                 new ConsentInput(request.PersonId, request.GivenOn, request.GivenBy, request.PermittedUses, request.ExpiresOn, request.Notes),
                 Actor);
             gateCache.Clear();
-            return Ok(ToDto(row));
+            return Ok(ToDto(row, null));
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
@@ -119,6 +120,32 @@ public class ImageController(
         {
             return NotFound();
         }
+    }
+
+    [HttpGet("consent/{consentId:guid}/evidence/history")]
+    [ProducesResponseType(typeof(IReadOnlyList<EvidenceEventDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetEvidenceHistory(Guid consentId)
+    {
+        try
+        {
+            var events = await consents.EvidenceHistoryAsync(consentId);
+            var names = new Dictionary<string, string>();
+            foreach (var key in events.Select(e => e.ActorKey).Distinct())
+                names[key] = await ActorNameAsync(key);
+            return Ok(events.Select(e => new EvidenceEventDto(e.Action, DateTime.SpecifyKind(e.WhenUtc, DateTimeKind.Utc), names[e.ActorKey])).ToList());
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>Backoffice user name for an audit actor key; "System" for automatic actions.</summary>
+    private async Task<string> ActorNameAsync(string actorKey)
+    {
+        if (!Guid.TryParse(actorKey, out var key)) return actorKey == Actors.System ? "System" : "Unknown";
+        return (await users.GetAsync(key))?.Name ?? "A removed user";
     }
 
     [HttpDelete("consent/{consentId:guid}/evidence")]
@@ -197,6 +224,7 @@ public class ImageController(
                 c.PermittedUses.Split(',', StringSplitOptions.RemoveEmptyEntries))).ToList(),
             uploaded);
         var today = DateOnly.FromDateTime(time.GetLocalNow().DateTime);
+        var info = await consents.EvidenceInfoAsync(consentRows);
 
         return new ImageGovernanceDto(
             mediaKey, facts.DateTaken, facts.DateObtained, facts.CustomExpiry, facts.NoPeople, tagged,
@@ -204,11 +232,11 @@ public class ImageController(
             StatusCalculator.Calculate(facts, options, today),
             StatusCalculator.Issues(facts, options, today),
             StatusCalculator.ClearedUses(facts, governanceOptions.PermittedUses, today),
-            consentRows.Select(ToDto).ToList(), uploaded);
+            consentRows.Select(c => ToDto(c, info.GetValueOrDefault(c.Id))).ToList(), uploaded);
     }
 
-    private static ConsentDto ToDto(ConsentRow c) =>
+    private static ConsentDto ToDto(ConsentRow c, EvidenceInfo? info) =>
         new(c.Id, c.PersonId, Dates.FromDb(c.GivenOn), c.GivenBy,
             c.PermittedUses.Split(',', StringSplitOptions.RemoveEmptyEntries), Dates.FromDb(c.ExpiresOn),
-            Dates.FromDb(c.WithdrawnOn), c.EvidencePath is not null, c.Notes);
+            Dates.FromDb(c.WithdrawnOn), c.EvidencePath is not null, c.Notes, info?.Type, info?.SizeBytes);
 }

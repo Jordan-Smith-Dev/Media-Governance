@@ -72,3 +72,23 @@ test("Withdraw asks first, and cancelling keeps the consent", async ({ page }) =
     await expect(page.getByText(/Withdraw consent from/i)).toHaveCount(0);
     await expect(withdraw).toBeVisible();
 });
+
+test("The evidence shows its type and size", async ({ page }) => {
+    await openGovernance(page, IMAGE);
+    await expect(page.locator(".evidence-meta").first()).toContainText(/(PDF|PNG|JPG) · \d/);
+});
+
+test("History records that the evidence was viewed", async ({ page }) => {
+    await openGovernance(page, IMAGE);
+
+    // Viewing is itself recorded, so view first, then look at the history.
+    await page.locator('uui-button[label="View evidence"]').first().click();
+    await expect(page.locator("dialog.preview img")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await page.locator("button.link", { hasText: "History" }).first().click();
+    const history = page.locator("dialog.history");
+    await expect(history).toBeVisible();
+    await expect(history.getByText("Viewed").first()).toBeVisible();
+    await expect(history.getByText("Administrator").first()).toBeVisible();
+});
