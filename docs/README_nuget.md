@@ -93,7 +93,7 @@ The effective expiry is the custom expiry if set, otherwise date taken (or date 
 
 ## Requirements
 
-- Umbraco 17 (`[17.0.0, 18.0.0)`), .NET 10.
+- Umbraco 17.8.1 or later (`[17.8.1, 18.0.0)`), .NET 10.
 - Only media items of type **Image** are governed.
 
 ## Installation
