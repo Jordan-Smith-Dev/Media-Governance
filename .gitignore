@@ -1,0 +1,12 @@
+.claude/
+.superpowers/
+bin/
+obj/
+node_modules/
+*.user
+.vs/
+src/*.TestSite/umbraco/Data/
+src/*.TestSite/umbraco/Logs/
+src/*.TestSite/umbraco/Mvc/
+src/*.TestSite/wwwroot/media/
+src/Umbraco.Community.MediaGovernance/wwwroot/

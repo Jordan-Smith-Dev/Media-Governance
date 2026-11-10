@@ -1,0 +1,50 @@
+using Umbraco.Community.MediaGovernance.Core.Models;
+
+namespace Umbraco.Community.MediaGovernance.Controllers;
+
+public record PersonDto(Guid Id, string Name, string? Email, string? Phone, Guid? LinkedMemberKey, Guid? LinkedUserKey, string? JobTitle, int TaggedInCount);
+
+public record PersonRequest(string Name, string? Email, string? Phone, Guid? LinkedMemberKey, Guid? LinkedUserKey, string? JobTitle = null);
+
+public record ConsentDto(
+    Guid Id,
+    Guid PersonId,
+    DateOnly GivenOn,
+    string GivenBy,
+    IReadOnlyList<string> PermittedUses,
+    DateOnly? ExpiresOn,
+    DateOnly? WithdrawnOn,
+    bool HasEvidence,
+    string? Notes);
+
+public record ConsentRequest(
+    Guid PersonId,
+    DateOnly GivenOn,
+    string GivenBy,
+    IReadOnlyList<string> PermittedUses,
+    DateOnly? ExpiresOn,
+    string? Notes);
+
+public record WithdrawRequest(DateOnly? On);
+
+public record ImageGovernanceDto(
+    Guid MediaKey,
+    DateOnly? DateTaken,
+    DateOnly? DateObtained,
+    DateOnly? CustomExpiry,
+    bool NoPeople,
+    IReadOnlyList<Guid> TaggedPersonIds,
+    DateOnly? EffectiveExpiry,
+    ExpirySource ExpirySource,
+    GovernanceStatus Status,
+    IReadOnlyList<GovernanceStatus> Issues,
+    IReadOnlyList<string> ClearedUses,
+    IReadOnlyList<ConsentDto> Consents,
+    DateOnly? DateUploaded = null);
+
+public record ImageGovernanceRequest(
+    DateOnly? DateTaken,
+    DateOnly? DateObtained,
+    DateOnly? CustomExpiry,
+    bool NoPeople,
+    IReadOnlyList<Guid> TaggedPersonIds);
