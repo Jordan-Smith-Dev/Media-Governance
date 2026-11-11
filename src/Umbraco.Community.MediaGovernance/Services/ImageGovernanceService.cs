@@ -30,4 +30,44 @@ public class ImageGovernanceService(IImageRepository images, IPersonRepository p
         await images.SaveAsync(row, update.TaggedPersonIds);
         await audit.WriteAsync(actor, "image.updated", mediaKey);
     }
+
+    public const int MaxBulk = 500;
+
+    /// <summary>
+    /// Applies one change to many images, keeping each image's other details and tags as they are.
+    /// "No people" is skipped for any image that already has someone tagged.
+    /// </summary>
+    public async Task<BulkImageResult> BulkAsync(IEnumerable<Guid> mediaKeys, BulkImageChange change, string actor)
+    {
+        var chosen = new[] { change.NoPeople, change.CustomExpiry is not null, change.ClearCustomExpiry }.Count(c => c);
+        if (chosen != 1)
+            throw new ArgumentException("Choose exactly one change: mark as no people, set an expiry date, or clear the expiry date.", nameof(change));
+
+        var keys = mediaKeys.Distinct().ToList();
+        if (keys.Count == 0) throw new ArgumentException("Choose at least one image.", nameof(mediaKeys));
+        if (keys.Count > MaxBulk) throw new ArgumentException($"Choose {MaxBulk} images or fewer at a time.", nameof(mediaKeys));
+
+        var updated = new List<Guid>();
+        var skipped = new List<Guid>();
+        foreach (var key in keys)
+        {
+            var row = await images.GetAsync(key) ?? new ImageRow { MediaKey = key };
+            var tagged = await images.GetTaggedPersonIdsAsync(key);
+
+            if (change.NoPeople)
+            {
+                if (tagged.Count > 0) { skipped.Add(key); continue; }   // someone is tagged, so "no people" would be wrong
+                row.NoPeople = true;
+            }
+            else
+            {
+                row.CustomExpiry = change.ClearCustomExpiry ? null : Dates.ToDb(change.CustomExpiry);
+            }
+
+            await images.SaveAsync(row, tagged);
+            await audit.WriteAsync(actor, "image.updated", key);
+            updated.Add(key);
+        }
+        return new BulkImageResult(updated, skipped);
+    }
 }

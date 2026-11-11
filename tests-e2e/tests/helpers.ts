@@ -42,3 +42,22 @@ export async function openGovernance(page: Page, image: string) {
     await page.goto(`/umbraco/section/media/workspace/media/edit/${key}/invariant/view/governance`);
     await expect(page.locator("umb-media-governance-image-view")).toBeVisible({ timeout: 30_000 });
 }
+
+/** Calls the package's own API with the backoffice's bearer token. */
+export async function api<T = unknown>(page: Page, method: "GET" | "PUT" | "POST", path: string, body?: unknown): Promise<T> {
+    const auth = tokens.get(page)?.value ?? "";
+    const res = await page.request.fetch(`${API}/${path}`, { method, headers: { Authorization: auth }, data: body });
+    expect(res.ok(), `${method} ${path} returned ${res.status()}`).toBeTruthy();
+    return (await res.json()) as T;
+}
+
+type ImageDetails = { dateTaken: string | null; dateObtained: string | null; customExpiry: string | null; noPeople: boolean; taggedPersonIds: string[] };
+
+/** Records an image's details so a test that changes them can put them back. */
+export async function snapshotImage(page: Page, mediaKey: string) {
+    const d = await api<ImageDetails>(page, "GET", `image/${mediaKey}`);
+    const original: ImageDetails = { dateTaken: d.dateTaken, dateObtained: d.dateObtained, customExpiry: d.customExpiry, noPeople: d.noPeople, taggedPersonIds: d.taggedPersonIds };
+    return { original, restore: () => api(page, "PUT", `image/${mediaKey}`, original) };
+}
+
+export { mediaKeyFor };

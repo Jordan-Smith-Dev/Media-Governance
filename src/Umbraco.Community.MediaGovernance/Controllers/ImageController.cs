@@ -63,6 +63,27 @@ public class ImageController(
         return Ok(await BuildAsync(mediaKey));
     }
 
+    [HttpPost("images/bulk")]
+    [ProducesResponseType(typeof(BulkImageDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Bulk([FromBody] BulkImageRequest request)
+    {
+        // Only real images are changed; anything else is counted as skipped.
+        var keys = (request.MediaKeys ?? []).Distinct().ToList();
+        var realImages = keys.Where(catalog.IsImage).ToList();
+        BulkImageResult result;
+        try
+        {
+            result = await images.BulkAsync(realImages, new BulkImageChange(request.NoPeople, request.CustomExpiry, request.ClearCustomExpiry), Actor);
+        }
+        catch (ArgumentException ex)
+        {
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+        foreach (var key in result.Updated) await fileIndex.RefreshAsync(key);
+        return Ok(new BulkImageDto(result.Updated.Count, result.Skipped.Count + (keys.Count - realImages.Count)));
+    }
+
     [HttpPost("image/{mediaKey:guid}/consent")]
     [ProducesResponseType(typeof(ConsentDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

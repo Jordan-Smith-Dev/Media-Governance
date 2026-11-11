@@ -106,6 +106,9 @@ export type ImageGovernanceRequest = Pick<
     "dateTaken" | "dateObtained" | "customExpiry" | "noPeople" | "taggedPersonIds"
 >;
 
+export type BulkImageChange = { noPeople?: boolean; customExpiry?: string | null; clearCustomExpiry?: boolean };
+export type BulkImageResult = { updated: number; skipped: number };
+
 export type AffectedImage = { mediaKey: string; name: string; status: GovernanceStatus };
 
 export type AffectedPage = {
@@ -211,6 +214,9 @@ export class GovernanceApi {
     }
     saveImage(mediaKey: string, r: ImageGovernanceRequest) {
         return this.#json<ImageGovernance>("PUT", `image/${mediaKey}`, r);
+    }
+    bulkImages(mediaKeys: string[], change: BulkImageChange) {
+        return this.#json<BulkImageResult>("POST", "images/bulk", { mediaKeys, noPeople: false, clearCustomExpiry: false, ...change });
     }
     addConsent(mediaKey: string, r: ConsentRequest) {
         return this.#json<Consent>("POST", `image/${mediaKey}/consent`, r);

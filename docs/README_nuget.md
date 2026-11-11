@@ -13,7 +13,8 @@ It has **no dependency on Umbraco UI Builder** or any other paid package.
 - **People repository**: people can be linked to an Umbraco member and/or user.
 - **Erasure on request**: permanently delete a person's details, consent records and evidence in one action. The audit log keeps an anonymised entry only.
 - **Folders show a marker** (red or amber) when they contain images that cannot be used or need attention, so you can find problems without opening every folder.
-- **Select rows and export just those** from the dashboard overview.
+- **Select rows and export just those** from the dashboard overview. The Export button exports the ticked images, or everything matching the current filter when none are ticked.
+- **Bulk actions on ticked images:** mark them as having no people (images that already have someone tagged are left alone), or set or remove a custom expiry date on all of them. Each image is audited.
 - **Retention rules**: default retention (3 years from date taken) and a warning window (90 days), both configurable.
 - **Daily email digest** to the addresses you choose when images enter *Expiring soon*, *Expired* or *No consent*.
 

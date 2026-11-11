@@ -1,5 +1,7 @@
 import { buttonStyles } from "../components/button-styles.js";
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
+import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
+import "../components/date-input.element.js";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
 import { STATUS_HELP, STATUS_LABELS, type GovernanceStatus, type OverviewSort, type OverviewItem, type OverviewPage, type Settings } from "../api/index.js";
 import { STATUS_COLORS, formatDate, relativeDays } from "./format.js";
@@ -29,6 +31,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
     @state() private _status: GovernanceStatus | null = null;
     @state() private _filter = "";
     @state() private _sort: OverviewSort = "Name";
+    @state() private _expiryDialog: { date: string } | null = null;
     @state() private _desc = false;
     @state() private _loading = true;
     @state() private _error = "";
@@ -133,6 +136,78 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         }
     }
 
+    override updated() {
+        const dialog = this.shadowRoot?.querySelector<HTMLDialogElement>("dialog[data-modal]");
+        if (dialog && !dialog.open) dialog.showModal();
+    }
+
+    #plural(n: number) {
+        return `${n} image${n === 1 ? "" : "s"}`;
+    }
+
+    async #afterBulk(result: { updated: number; skipped: number }, what: string) {
+        const skipped = result.skipped > 0 ? ` ${this.#plural(result.skipped)} left alone because someone is tagged.` : "";
+        this.notify(result.updated > 0 ? "positive" : "danger", `${what}: ${this.#plural(result.updated)} updated.${skipped}`);
+        this._selected = new Set();
+        await this.#load(false);
+    }
+
+    async #bulkNoPeople() {
+        const count = this._selected.size;
+        try {
+            await umbConfirmModal(this, {
+                headline: `Mark ${this.#plural(count)} as having no people?`,
+                content: "They will stop showing as Needs tagging. Images that already have someone tagged are left alone.",
+                confirmLabel: "Mark as no people",
+            });
+        } catch {
+            return; // cancelled
+        }
+        try {
+            await this.#afterBulk(await this.api.bulkImages([...this._selected], { noPeople: true }), "Marked as no people");
+        } catch (e) {
+            this.notify("danger", errorMessage(e));
+        }
+    }
+
+    async #applyExpiry(clear: boolean) {
+        const dialog = this._expiryDialog;
+        if (!dialog) return;
+        if (!clear && !dialog.date) {
+            this.notify("danger", "Choose an expiry date.");
+            return;
+        }
+        try {
+            const change = clear ? { clearCustomExpiry: true } : { customExpiry: dialog.date };
+            const result = await this.api.bulkImages([...this._selected], change);
+            this._expiryDialog = null;
+            await this.#afterBulk(result, clear ? "Expiry date removed" : "Expiry date set");
+        } catch (e) {
+            this.notify("danger", errorMessage(e));
+        }
+    }
+
+    #renderExpiryDialog() {
+        const d = this._expiryDialog;
+        if (!d) return nothing;
+        const close = () => (this._expiryDialog = null);
+        return html`
+            <dialog class="bulk" data-modal aria-labelledby="bulk-title" @close=${close}>
+                <div class="bulk-head"><strong id="bulk-title">Set expiry date for ${this.#plural(this._selected.size)}</strong></div>
+                <div class="bulk-body">
+                    <p class="muted">This replaces any custom expiry the images have now. Without one, an image expires after the retention period set in Settings.</p>
+                    <umb-media-governance-date-input label="Expiry date" .value=${d.date} @change=${(e: Event) => (this._expiryDialog = { date: (e as CustomEvent<string>).detail ?? "" })}></umb-media-governance-date-input>
+                </div>
+                <div class="bulk-foot">
+                    <uui-button class="action" look="secondary" label="Remove expiry" title="Go back to the default retention period" @click=${() => this.#applyExpiry(true)}>Remove expiry</uui-button>
+                    <span class="spacer"></span>
+                    <uui-button class="action" look="secondary" label="Cancel" @click=${close}>Cancel</uui-button>
+                    <uui-button class="action" look="primary" label="Set expiry" @click=${() => this.#applyExpiry(false)}>Set expiry</uui-button>
+                </div>
+            </dialog>
+        `;
+    }
+
     #toggle(key: string, checked: boolean) {
         const next = new Set(this._selected);
         if (checked) next.add(key);
@@ -180,7 +255,9 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                     <uui-icon name="icon-search" slot="prepend"></uui-icon>
                 </uui-input>
                 ${this._selected.size > 0
-                    ? html`<uui-button class="action" look="outline" label="Clear selection" @click=${() => (this._selected = new Set())}>Clear selection</uui-button>`
+                    ? html`<uui-button class="action" look="outline" label="Clear selection" @click=${() => (this._selected = new Set())}>Clear selection</uui-button>
+                          <uui-button class="action" look="outline" label="Mark as no people" title="Mark the ticked images as having nobody pictured" @click=${this.#bulkNoPeople}><uui-icon name="icon-user"></uui-icon>No people</uui-button>
+                          <uui-button class="action" look="outline" label="Set expiry date" title="Set one expiry date on the ticked images" @click=${() => (this._expiryDialog = { date: "" })}><uui-icon name="icon-calendar"></uui-icon>Set expiry</uui-button>`
                     : nothing}
                 <uui-button class="action" look="primary" label=${this._selected.size > 0 ? "Export selected" : "Export all matching"}
                     title=${this._selected.size > 0 ? "Exports only the images you have ticked" : "Exports every image matching the current filter. Tick images to export only those."}
@@ -188,6 +265,8 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                     <uui-icon name="icon-download-alt"></uui-icon> ${this._selected.size > 0 ? `Export selected (${this._selected.size})` : "Export"}
                 </uui-button>
             </div>
+
+            ${this.#renderExpiryDialog()}
 
             ${filtering
                 ? html`
@@ -320,6 +399,13 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         .images uui-table-head-cell { color: var(--uui-color-text-alt); font-weight: 600; }
         /* Keep the column headings in view while a long list scrolls; they need a solid background. */
         .images uui-table-head-cell { position: sticky; top: 0; z-index: 2; background: var(--uui-color-surface); }
+        dialog.bulk { width: min(600px, 92vw); padding: 0; border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); background: var(--uui-color-surface); color: var(--uui-color-text); box-shadow: var(--uui-shadow-depth-5); }
+        dialog.bulk::backdrop { background: rgba(0, 0, 0, 0.5); }
+        .bulk-head, .bulk-foot { display: flex; align-items: center; gap: var(--uui-size-space-4); padding: var(--uui-size-space-4) var(--uui-size-space-5); }
+        .bulk-head { border-bottom: 1px solid var(--uui-color-border); }
+        .bulk-foot { border-top: 1px solid var(--uui-color-border); }
+        .bulk-body { padding: var(--uui-size-space-4) var(--uui-size-space-5); display: flex; flex-direction: column; gap: var(--uui-size-space-4); }
+        .bulk-foot .spacer { flex: 1; }
         .sort { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: var(--uui-size-space-2); font-weight: 600; color: inherit; }
         .sort:hover, .sort.active { color: var(--uui-color-interactive-emphasis); }
         .sort:focus-visible { outline: 2px solid var(--uui-color-focus); outline-offset: 2px; border-radius: 2px; }

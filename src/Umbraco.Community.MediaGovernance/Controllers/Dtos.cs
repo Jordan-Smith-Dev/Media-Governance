@@ -46,6 +46,10 @@ public record ImageGovernanceDto(
     IReadOnlyList<ConsentDto> Consents,
     DateOnly? DateUploaded = null);
 
+public record BulkImageRequest(IReadOnlyList<Guid> MediaKeys, bool NoPeople, DateOnly? CustomExpiry, bool ClearCustomExpiry);
+
+public record BulkImageDto(int Updated, int Skipped);
+
 public record ImageGovernanceRequest(
     DateOnly? DateTaken,
     DateOnly? DateObtained,

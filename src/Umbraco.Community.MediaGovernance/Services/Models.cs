@@ -19,6 +19,11 @@ public record ImageGovernanceUpdate(
     bool NoPeople,
     IReadOnlyList<Guid> TaggedPersonIds);
 
+/// <summary>One change applied to many images: mark them as having no people, set one expiry date, or clear it.</summary>
+public record BulkImageChange(bool NoPeople, DateOnly? CustomExpiry, bool ClearCustomExpiry);
+
+public record BulkImageResult(IReadOnlyList<Guid> Updated, IReadOnlyList<Guid> Skipped);
+
 public record GovernanceOptions(
     int RetentionYears,
     int WarningDays,
