@@ -537,13 +537,13 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                                           <div class="evidence-cell">
                                           <div class="action-buttons evidence-buttons">
                                               ${c.hasEvidence
-                                                  ? html`<uui-button class="action" look="primary" compact label="View evidence" @click=${() => this.#viewEvidence(c)}>View</uui-button>`
+                                                  ? html`<uui-button class="action" look="primary" compact label="View evidence" @click=${() => this.#viewEvidence(c)}><uui-icon name="icon-eye"></uui-icon>View</uui-button>`
                                                   : nothing}
                                               <uui-button class="action" look="secondary" compact label=${c.hasEvidence ? "Replace evidence" : "Upload evidence"} @click=${() => this.#pickEvidence(c)}>
-                                                  ${c.hasEvidence ? "Replace" : "Upload"}
+                                                  <uui-icon name=${c.hasEvidence ? "icon-sync" : "icon-cloud-upload"}></uui-icon>${c.hasEvidence ? "Replace" : "Upload"}
                                               </uui-button>
                                               ${c.hasEvidence
-                                                  ? html`<uui-button class="action" look="secondary" color="danger" compact label="Remove evidence" @click=${() => this.#removeEvidence(c)}>Remove</uui-button>`
+                                                  ? html`<uui-button class="action" look="primary" color="danger" compact label="Remove evidence" @click=${() => this.#removeEvidence(c)}><uui-icon name="icon-trash"></uui-icon>Remove</uui-button>`
                                                   : nothing}
                                           </div>
                                           ${c.hasEvidence
@@ -557,7 +557,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                                       <uui-table-cell class="actions">
                                           ${c.withdrawnOn
                                               ? nothing
-                                              : html`<uui-button class="action" look="primary" color="danger" compact label="Withdraw consent" @click=${() => this.#withdraw(c)}>Withdraw</uui-button>`}
+                                              : html`<uui-button class="action" look="primary" color="danger" compact label="Withdraw consent" @click=${() => this.#withdraw(c)}><uui-icon name="icon-block"></uui-icon>Withdraw</uui-button>`}
                                       </uui-table-cell>
                                   </uui-table-row>
                               `;

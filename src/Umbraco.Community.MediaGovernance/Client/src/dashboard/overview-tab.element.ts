@@ -15,6 +15,8 @@ const TILES: { status: GovernanceStatus | null; label: string; hint: string; ico
     { status: "Expired", label: "Expired", hint: "Must stop being used", icon: "icon-block" },
 ];
 
+const NO_PEOPLE_EXPIRED_HELP = "No people are pictured, so no consent is needed. The image has passed its expiry date, so it should not be used.";
+
 const SORTS: OverviewSort[] = ["Name", "Folder", "DateTaken", "Expiry", "Status"];
 
 @customElement("umb-media-governance-overview")
@@ -176,13 +178,12 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                     <uui-icon name="icon-search" slot="prepend"></uui-icon>
                 </uui-input>
                 ${this._selected.size > 0
-                    ? html`<uui-button class="action" look="outline" label="Clear selection" @click=${() => (this._selected = new Set())}>Clear selection</uui-button>
-                          <uui-button class="action" look="outline" color="positive" label="Export selected" @click=${() => this.#export(true)}>
-                              <uui-icon name="icon-download-alt"></uui-icon> Export selected (${this._selected.size})
-                          </uui-button>`
+                    ? html`<uui-button class="action" look="outline" label="Clear selection" @click=${() => (this._selected = new Set())}>Clear selection</uui-button>`
                     : nothing}
-                <uui-button class="action" look="primary" label="Export all matching" @click=${() => this.#export(false)}>
-                    <uui-icon name="icon-download-alt"></uui-icon> Export
+                <uui-button class="action" look="primary" label=${this._selected.size > 0 ? "Export selected" : "Export all matching"}
+                    title=${this._selected.size > 0 ? "Exports only the images you have ticked" : "Exports every image matching the current filter. Tick images to export only those."}
+                    @click=${() => this.#export(this._selected.size > 0)}>
+                    <uui-icon name="icon-download-alt"></uui-icon> ${this._selected.size > 0 ? `Export selected (${this._selected.size})` : "Export"}
                 </uui-button>
             </div>
 
@@ -210,7 +211,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         return html`
             <div class="chips" title=${item.people.join(", ")}>
                 ${shown.map((p) => html`<uui-tag look="secondary">${p}</uui-tag>`)}
-                ${more > 0 ? html`<uui-tag look="placeholder">+${more}</uui-tag>` : nothing}
+                ${more > 0 ? html`<uui-tag look="placeholder" title=${item.people.slice(MAX_PEOPLE_SHOWN).join(", ")}>+${more}</uui-tag>` : nothing}
             </div>
         `;
     }
@@ -253,7 +254,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                         <uui-table-row>
                             <uui-table-cell>
                                 <uui-checkbox aria-label=${`Select ${i.name}`} .checked=${this._selected.has(i.mediaKey)} @change=${(e: Event) => this.#toggle(i.mediaKey, (e.target as HTMLInputElement).checked)}></uui-checkbox>
-                                <a class="name" href="/umbraco/section/media/workspace/media/edit/${i.mediaKey}">${i.name}</a>
+                                <a class="name" href="/umbraco/section/media/workspace/media/edit/${i.mediaKey}/invariant/view/governance" title="Open the governance details for ${i.name}">${i.name}</a>
                             </uui-table-cell>
                             <uui-table-cell>${i.folder || html`<span class="muted">Media root</span>`}</uui-table-cell>
                             <uui-table-cell>${this.#renderPeople(i)}</uui-table-cell>
@@ -261,13 +262,13 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                             <uui-table-cell>
                                 ${formatDate(i.expiry)}
                                 ${i.daysToExpiry !== null
-                                    ? html`<div class="sub ${i.daysToExpiry <= 0 ? "late" : ""}">${relativeDays(i.daysToExpiry)}${i.expirySource === "Custom" ? " · custom" : i.expirySource === "Consent" ? " · consent" : ""}</div>`
+                                    ? html`<div class="sub ${i.daysToExpiry <= 0 ? "late" : ""}">${i.daysToExpiry < 0 ? "Expired " : ""}${relativeDays(i.daysToExpiry)}${i.expirySource === "Custom" ? " · custom" : i.expirySource === "Consent" ? " · consent" : ""}</div>`
                                     : nothing}
                             </uui-table-cell>
                             <uui-table-cell>${this.#renderConsent(i)}</uui-table-cell>
                             <uui-table-cell>
                                 <div class="statuses" title=${i.issues.map((s) => STATUS_LABELS[s]).join(", ")}>
-                                    <uui-tag color=${STATUS_COLORS[i.status]} title=${STATUS_HELP[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
+                                    <uui-tag color=${STATUS_COLORS[i.status]} title=${i.status === "Expired" && i.noPeople ? NO_PEOPLE_EXPIRED_HELP : STATUS_HELP[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
                                     ${i.issues.length > 1 ? html`<uui-tag look="secondary">+${i.issues.length - 1}</uui-tag>` : nothing}
                                 </div>
                             </uui-table-cell>

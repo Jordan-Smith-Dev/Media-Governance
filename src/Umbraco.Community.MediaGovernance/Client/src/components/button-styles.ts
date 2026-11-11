@@ -9,6 +9,6 @@ export const buttonStyles = css`
         min-width: 9rem;
     }
     uui-button.action[compact] {
-        min-width: 5.75rem;
+        min-width: 6.5rem;
     }
 `;
