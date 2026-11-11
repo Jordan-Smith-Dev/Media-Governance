@@ -318,6 +318,8 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         /* Table */
         .images uui-table-cell, .images uui-table-head-cell { padding: var(--uui-size-space-4) var(--uui-size-space-5); }
         .images uui-table-head-cell { color: var(--uui-color-text-alt); font-weight: 600; }
+        /* Keep the column headings in view while a long list scrolls; they need a solid background. */
+        .images uui-table-head-cell { position: sticky; top: 0; z-index: 2; background: var(--uui-color-surface); }
         .sort { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: var(--uui-size-space-2); font-weight: 600; color: inherit; }
         .sort:hover, .sort.active { color: var(--uui-color-interactive-emphasis); }
         .sort:focus-visible { outline: 2px solid var(--uui-color-focus); outline-offset: 2px; border-radius: 2px; }

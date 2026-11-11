@@ -50,3 +50,18 @@ test("An empty search explains what to do", async ({ page }) => {
     await page.goto(`${DASHBOARD}?q=zzzz-no-such-image`);
     await expect(page.getByText(/Try a different status or search/i)).toBeVisible();
 });
+
+test("Column headings stay in view while the list scrolls", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 500 });
+    await page.goto(DASHBOARD);
+    await page.locator("uui-table-row").nth(5).waitFor();
+    const heading = page.locator("button.sort", { hasText: "Expiry date" });
+    const before = (await heading.boundingBox())!.y;
+
+    await page.locator("uui-table-row").last().scrollIntoViewIfNeeded();
+    const after = (await heading.boundingBox())!.y;
+
+    expect(after, "heading scrolled out of view").toBeGreaterThanOrEqual(0);
+    expect(after, "heading did not stay put").toBeLessThan(250);
+    expect(after).toBeLessThanOrEqual(before);
+});
