@@ -129,10 +129,12 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     }
 
     /** Opens the consent form once any tag changes have reached the server (consent needs saved tags). */
-    async #openConsentForm() {
+    async #openConsentForm(personId?: unknown) {
         await this.#pending;
         const tagged = this._data?.taggedPersonIds ?? [];
-        this._consentForm = blankConsent(tagged.length === 1 ? tagged[0] : "");
+        // A click handler passes an event here, so only trust a string.
+        const preselect = typeof personId === "string" ? personId : tagged.length === 1 ? tagged[0] : "";
+        this._consentForm = blankConsent(preselect);
         await this.updateComplete;
         this.shadowRoot?.querySelector(".consent-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -364,6 +366,29 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         return { label: c.expiresOn ? `Active until ${formatDate(c.expiresOn)}` : "Active, no expiry", color: "positive", help: "Consent is in force for the permitted uses shown." };
     }
 
+    /** Tagged people with no consent in force (none recorded, or every one withdrawn or expired). */
+    #withoutConsent(d: ImageGovernance): string[] {
+        const today = todayIso();
+        return d.taggedPersonIds.filter(
+            (id) => !d.consents.some((c) => c.personId === id && !c.withdrawnOn && !(c.expiresOn && c.expiresOn <= today))
+        );
+    }
+
+    #renderConsentNotice(d: ImageGovernance) {
+        const missing = this.#withoutConsent(d);
+        if (missing.length === 0 || this._consentForm) return nothing;
+        const names = missing.map((id) => this.#personName(id));
+        const who = names.length <= 2 ? names.join(" and ") : `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
+        return html`
+            <div class="notice" role="status">
+                <span><strong>${who}</strong> ${names.length === 1 ? "has" : "have"} no current consent for this image, so it shows as No consent and should not be used yet.</span>
+                <uui-button look="primary" compact label="Add consent for ${names[0]}" @click=${() => this.#openConsentForm(missing[0])}>
+                    <uui-icon name="icon-add"></uui-icon>Add consent
+                </uui-button>
+            </div>
+        `;
+    }
+
     #personName(id: string) {
         return this._people.find((p) => p.id === id)?.name ?? "Unknown person";
     }
@@ -504,6 +529,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     #renderConsents(d: ImageGovernance) {
         const hasTags = d.taggedPersonIds.length > 0;
         return html`
+            ${this.#renderConsentNotice(d)}
             ${d.consents.length === 0
                 ? html`<p class="muted">No consent recorded yet. Tag the people pictured above, then use Add consent to record each person's consent.</p>`
                 : html`
@@ -643,6 +669,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         .radios { display: flex; flex-direction: row; flex-wrap: wrap; gap: var(--uui-size-space-5); }
         .uses { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-5); }
         .muted { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
+        .notice { display: flex; align-items: center; justify-content: space-between; gap: var(--uui-size-space-4); margin-bottom: var(--uui-size-space-4); padding: var(--uui-size-space-3) var(--uui-size-space-4); border-left: 4px solid var(--uui-color-warning); background: var(--uui-color-surface-alt); }
         .autosave-note { margin: 0; color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); text-align: right; }
         .add-consent { display: flex; align-items: center; gap: var(--uui-size-space-4); margin-top: var(--uui-size-space-5); }
         uui-table + .add-consent { margin-top: var(--uui-size-space-6); }
@@ -661,7 +688,11 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         button.link { all: unset; cursor: pointer; color: var(--uui-color-interactive); text-decoration: underline; }
         button.link:hover { color: var(--uui-color-interactive-emphasis); }
         button.link:focus-visible { outline: 2px solid var(--uui-color-focus); outline-offset: 2px; }
-        .history-body { padding: var(--uui-size-space-4) var(--uui-size-space-5); max-height: 60vh; overflow: auto; }
+        .history-body { padding: 0 var(--uui-size-space-5) var(--uui-size-space-4); max-height: 60vh; overflow: auto; }
+        .history-body .muted { margin-top: var(--uui-size-space-4); }
+        /* The header sticks while scrolling, so it needs a solid background or rows show through it. */
+        .history-body uui-table-head { position: sticky; top: 0; z-index: 1; background: var(--uui-color-surface); }
+        .history-body uui-table-head-cell { background: var(--uui-color-surface); }
         .person-link { color: var(--uui-color-interactive); font-weight: 600; text-decoration: none; }
         .person-link:hover { color: var(--uui-color-interactive-emphasis); text-decoration: underline; }
         input[type="file"] { max-width: 100%; }

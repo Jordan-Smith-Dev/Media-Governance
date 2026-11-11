@@ -17,6 +17,8 @@ const TILES: { status: GovernanceStatus | null; label: string; hint: string; ico
 
 const NO_PEOPLE_EXPIRED_HELP = "No people are pictured, so no consent is needed. The image has passed its expiry date, so it should not be used.";
 
+const NEWLINES = "\n\n";
+
 const SORTS: OverviewSort[] = ["Name", "Folder", "DateTaken", "Expiry", "Status"];
 
 @customElement("umb-media-governance-overview")
@@ -267,9 +269,9 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                             </uui-table-cell>
                             <uui-table-cell>${this.#renderConsent(i)}</uui-table-cell>
                             <uui-table-cell>
-                                <div class="statuses" title=${i.issues.map((s) => STATUS_LABELS[s]).join(", ")}>
+                                <div class="statuses">
                                     <uui-tag color=${STATUS_COLORS[i.status]} title=${i.status === "Expired" && i.noPeople ? NO_PEOPLE_EXPIRED_HELP : STATUS_HELP[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
-                                    ${i.issues.length > 1 ? html`<uui-tag look="secondary">+${i.issues.length - 1}</uui-tag>` : nothing}
+                                    ${i.issues.length > 1 ? html`<uui-tag look="secondary" title=${i.issues.filter((s) => s !== i.status).map((s) => `${STATUS_LABELS[s]}: ${STATUS_HELP[s]}`).join(NEWLINES)}>+${i.issues.length - 1}</uui-tag>` : nothing}
                                 </div>
                             </uui-table-cell>
                         </uui-table-row>
