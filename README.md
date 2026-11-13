@@ -115,6 +115,20 @@ ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Umbraco.Community.Me
 
 Open `https://localhost:44399/umbraco`. The test login is in `src/Umbraco.Community.MediaGovernance.TestSite/appsettings.Development.json` (a throw-away local account; change nothing there for production). Development settings allow concurrent logins so browser tests do not sign you out.
 
+**Try the daily email locally**
+
+The test site's Development settings write emails to a folder instead of sending them (`Smtp.DeliveryMethod: SpecifiedPickupDirectory`, folder `umbraco/Data/TEMP/Mail` inside the test site). To see one:
+
+1. Start the test site as above.
+2. In the dashboard's **Settings** tab, add your address under *Notification emails* and save. Nothing is sent to it; it is only used as the recipient.
+3. The digest only lists images that have *newly* needed attention since the last run, and the site remembers what it has already reported. To make everything count as new, stop the site and empty the `mgNotified` table in `umbraco/Data/Umbraco.sqlite.db` (any SQLite tool, for example `DELETE FROM mgNotified;`).
+4. Start the site. The job runs two minutes after startup. Wait, then open the newest `.eml` file in the folder above (double-click it, it opens in Outlook or Mail, or open it in any text editor).
+5. Check the links. They use `Umbraco:CMS:WebRouting:UmbracoApplicationUrl` (set to `https://localhost:44399` for the test site), so they open the image's Governance tab. Remove that setting to see the plain-text fallback.
+
+To send through a real mail server instead, replace the `Smtp` block in `appsettings.Development.json` with your server details (host, port, username, password, `From`). Use a throw-away mailbox, and do not commit credentials.
+
+If no file appears: check that a recipient is saved, that `mgNotified` was emptied, that some image is Expired, No consent, Needs tagging or Expiring soon, and look for warnings in the site log.
+
 **Tests**
 
 ```
