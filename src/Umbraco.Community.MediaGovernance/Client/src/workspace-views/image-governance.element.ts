@@ -540,7 +540,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                               <uui-table-head-cell>Permitted uses</uui-table-head-cell>
                               <uui-table-head-cell>Status</uui-table-head-cell>
                               <uui-table-head-cell>Evidence</uui-table-head-cell>
-                              <uui-table-head-cell></uui-table-head-cell>
+                              <uui-table-head-cell>Consent</uui-table-head-cell>
                           </uui-table-head>
                           ${d.consents.map((c) => {
                               const status = this.#consentStatus(c);
@@ -583,7 +583,8 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                                       <uui-table-cell class="actions">
                                           ${c.withdrawnOn
                                               ? nothing
-                                              : html`<uui-button class="action" look="primary" color="danger" compact label="Withdraw consent" @click=${() => this.#withdraw(c)}><uui-icon name="icon-block"></uui-icon>Withdraw</uui-button>`}
+                                              : html`<uui-button class="action" look="primary" color="danger" compact label="Withdraw consent" @click=${() => this.#withdraw(c)}><uui-icon name="icon-block"></uui-icon>Withdraw</uui-button>
+                                                <div class="evidence-meta muted">Ends this consent today</div>`}
                                       </uui-table-cell>
                                   </uui-table-row>
                               `;
@@ -680,7 +681,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         uui-table-cell { vertical-align: middle; }
         .consents uui-table-cell { padding-top: var(--uui-size-space-4); padding-bottom: var(--uui-size-space-4); }
         .chips { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-2); }
-        .actions { text-align: right; white-space: nowrap; }
+        .actions { text-align: left; white-space: nowrap; }
         .action-buttons { display: flex; align-items: center; justify-content: flex-end; gap: var(--uui-size-space-2); }
         .evidence-buttons { justify-content: flex-start; }
         .evidence-cell { display: flex; flex-direction: column; gap: var(--uui-size-space-2); }

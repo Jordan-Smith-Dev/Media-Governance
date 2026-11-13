@@ -163,6 +163,12 @@ public class MediaFileRepository(IScopeProvider scopeProvider) : IMediaFileRepos
         return scope.Database.Fetch<Guid>($"SELECT MediaKey FROM {TableNames.MediaFile}");
     }
 
+    public async Task<IReadOnlyDictionary<Guid, string>> ListPathsAsync()
+    {
+        using var scope = scopeProvider.CreateScope(autoComplete: true);
+        return scope.Database.Fetch<MediaFileRow>($"SELECT * FROM {TableNames.MediaFile}").ToDictionary(r => r.MediaKey, r => r.FilePath);
+    }
+
     public async Task UpsertAsync(Guid mediaKey, string normalizedPath)
     {
         using var scope = scopeProvider.CreateScope();

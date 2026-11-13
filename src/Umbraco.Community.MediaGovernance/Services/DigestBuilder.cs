@@ -26,7 +26,7 @@ public static class DigestBuilder
     /// With a <paramref name="siteUrl"/>, each name links to that image's Governance tab and the email ends with a
     /// link to the dashboard. Without one (the site's address is not known yet) names are plain text.
     /// </summary>
-    public static string Build(IReadOnlyList<Transition> transitions, IReadOnlyDictionary<Guid, string> names, Uri? siteUrl = null)
+    public static string Build(IReadOnlyList<Transition> transitions, IReadOnlyDictionary<Guid, string> names, Uri? siteUrl = null, IReadOnlyDictionary<Guid, string>? fileNames = null)
     {
         var body = new StringBuilder("<p>These images in the media library need attention:</p>");
         foreach (var (status, label) in Order)
@@ -38,9 +38,13 @@ public static class DigestBuilder
             foreach (var t in group.Take(MaxPerGroup))
                 {
                 var name = WebUtility.HtmlEncode(names.GetValueOrDefault(t.MediaKey, t.MediaKey.ToString()));
+                // The file name (with extension) after the name makes the image easy to find in the library or on disk.
+                var file = fileNames is not null && fileNames.TryGetValue(t.MediaKey, out var f) && !string.IsNullOrWhiteSpace(f)
+                    ? $" ({WebUtility.HtmlEncode(f)})"
+                    : "";
                 body.Append(siteUrl is null
-                    ? $"<li>{name}</li>"
-                    : $"<li><a href=\"{WebUtility.HtmlEncode(new Uri(siteUrl, ImagePath + t.MediaKey + "/invariant/view/governance").AbsoluteUri)}\">{name}</a></li>");
+                    ? $"<li>{name}{file}</li>"
+                    : $"<li><a href=\"{WebUtility.HtmlEncode(new Uri(siteUrl, ImagePath + t.MediaKey + "/invariant/view/governance").AbsoluteUri)}\">{name}</a>{file}</li>");
             }
             body.Append("</ul>");
             if (group.Count > MaxPerGroup)

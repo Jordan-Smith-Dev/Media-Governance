@@ -79,6 +79,17 @@ public class DigestBuilderTests
     }
 
     [Fact]
+    public void The_file_name_follows_the_image_name_in_brackets()
+    {
+        var key = Guid.NewGuid();
+        var t = new[] { new Transition(key, GovernanceStatus.Expired) };
+        var n = new Dictionary<Guid, string> { [key] = "Aerial" };
+        var f = new Dictionary<Guid, string> { [key] = "campus-aerial.jpg" };
+        Assert.Contains("<li>Aerial (campus-aerial.jpg)</li>", DigestBuilder.Build(t, n, null, f));
+        Assert.Contains(">Aerial</a> (campus-aerial.jpg)</li>", DigestBuilder.Build(t, n, new Uri("https://example.com/"), f));
+    }
+
+    [Fact]
     public void An_unknown_image_falls_back_to_its_key()
     {
         var key = Guid.NewGuid();

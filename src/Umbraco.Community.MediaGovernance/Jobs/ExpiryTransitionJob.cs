@@ -19,6 +19,11 @@ public class ExpiryTransitionJob(IServiceScopeFactory scopes, ILogger<ExpiryTran
 
     public event EventHandler PeriodChanged { add { } remove { } }
 
+    /// <summary>File name with extension per image, e.g. "team-2021.jpg", taken from the recorded file path.</summary>
+    private static async Task<IReadOnlyDictionary<Guid, string>> FileNamesAsync(IServiceProvider sp) =>
+        (await sp.GetRequiredService<IMediaFileRepository>().ListPathsAsync())
+            .ToDictionary(p => p.Key, p => Path.GetFileName(p.Value));
+
     public async Task RunJobAsync()
     {
         using var scope = scopes.CreateScope();
@@ -36,7 +41,7 @@ public class ExpiryTransitionJob(IServiceScopeFactory scopes, ILogger<ExpiryTran
         if (transitions.Count > 0)
         {
             var names = (await catalog.ListImagesAsync()).ToDictionary(i => i.Key, i => i.Name);
-            sent = await sp.GetRequiredService<NotificationService>().SendAsync(transitions, names);
+            sent = await sp.GetRequiredService<NotificationService>().SendAsync(transitions, names, await FileNamesAsync(sp));
             if (sent)
                 logger.LogInformation("Media governance: {Count} image(s) need attention.", transitions.Count);
             else

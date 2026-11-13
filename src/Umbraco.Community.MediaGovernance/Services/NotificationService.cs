@@ -16,13 +16,13 @@ public class NotificationService(
     IHostingEnvironment hosting,
     ILogger<NotificationService> logger)
 {
-    public async Task<bool> SendAsync(IReadOnlyList<Transition> transitions, IReadOnlyDictionary<Guid, string> names)
+    public async Task<bool> SendAsync(IReadOnlyList<Transition> transitions, IReadOnlyDictionary<Guid, string> names, IReadOnlyDictionary<Guid, string>? fileNames = null)
     {
         var options = await settings.GetAsync();
         if (transitions.Count == 0 || options.NotificationEmails.Count == 0 || !email.CanSendRequiredEmail())
             return false;
 
-        var body = DigestBuilder.Build(transitions, names, hosting.ApplicationMainUrl);
+        var body = DigestBuilder.Build(transitions, names, hosting.ApplicationMainUrl, fileNames);
         var from = global.Value.Smtp?.From ?? "noreply@localhost";
         var sent = 0;
         foreach (var to in options.NotificationEmails)
