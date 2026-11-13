@@ -10,3 +10,5 @@ src/*.TestSite/umbraco/Logs/
 src/*.TestSite/umbraco/Mvc/
 src/*.TestSite/wwwroot/media/
 src/Umbraco.Community.MediaGovernance/wwwroot/
+site.log
+*.log

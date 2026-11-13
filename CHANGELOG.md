@@ -13,7 +13,15 @@ First version: Phase 1, media compliance.
 - Retention starts from date taken, then date obtained, then the upload date, so undated and older images still expire.
 - The daily email now also covers images that need tagging.
 - Media folders show a red or amber marker when they contain images that cannot be used or need attention. Image icons in the tree are coloured by status.
-- Dashboard: row selection with "Export selected", consent shown as solid green and red pills, "No people" and "Not tagged yet" wording.
+- Dashboard: row selection, consent shown as solid green and red pills, "No people" and "Not tagged yet" wording.
+- One Export button: exports the ticked images, or everything matching the current filter when none are ticked.
+- Overview sorting by any column, with search, filter and sort kept in the address so a view can be shared. Column headings stay in view while scrolling. Status tooltips explain each status, and the "+N" chips list the hidden names and issues.
+- Bulk actions on ticked images (up to 500): mark as no people (images with someone tagged are skipped), set or remove a custom expiry. Each image is audited.
+- Evidence: view, download, replace and remove from the Governance tab; type and size shown; uploads checked against PDF/PNG/JPG signatures; a history of who uploaded, viewed or removed it.
+- A notice on an image when a tagged person has no consent in force, with a shortcut to add one. Tagging is not blocked.
+- Pages affected tab, changes saved immediately, a fixed "Given by" list, settings validation and a custom calendar.
+- Icons on action buttons; Remove is red. Dark mode checked.
+- 239 unit tests and 28 browser tests.
 - Front-end helpers: a `<media-governance>` tag helper and an `IMediaGovernanceUsage` service so templates can leave out expired images and images without consent. Withheld images are written to the Umbraco log as warnings (de-duplicated) with the page path, so affected pages can be found.
 
 Differences from the design prototype:
