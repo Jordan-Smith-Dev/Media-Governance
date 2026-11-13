@@ -37,7 +37,7 @@ test("The history table header is solid, so rows do not show through it", async 
     await openGovernance(page, "Graduation 2023");
     await page.locator('uui-button[label="View evidence"]').first().click();
     await page.locator("dialog.preview[open]").waitFor();
-    await page.locator("dialog.preview[open] .preview-head uui-button[label=Close]").click();
+    await page.locator("dialog.preview[open] .preview-foot uui-button[label=Close]").click();
     await page.locator("button.link", { hasText: "History" }).first().click();
     const bg = await page.locator("dialog.history uui-table-head-cell").first().evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(bg).not.toBe("rgba(0, 0, 0, 0)");

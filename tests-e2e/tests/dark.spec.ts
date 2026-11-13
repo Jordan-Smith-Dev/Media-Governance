@@ -45,7 +45,7 @@ test("Evidence preview and history in dark mode", async ({ page }) => {
     await page.locator("dialog.preview[open]").waitFor();
     await expectDarkSurface(page, "dialog.preview[open]");
     await page.screenshot({ path: "test-results/dark-preview.png" });
-    await page.locator("dialog.preview[open] .preview-head uui-button[label=Close]").click();
+    await page.locator("dialog.preview[open] .preview-foot uui-button[label=Close]").click();
     await page.locator("button.link", { hasText: "History" }).first().click();
     await page.locator("dialog.history[open]").waitFor();
     await expectDarkSurface(page, "dialog.history[open]");

@@ -284,8 +284,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         return html`
             <dialog class="preview history" data-modal aria-labelledby="history-title" @close=${this.#closeHistory} @click=${(e: Event) => e.target === e.currentTarget && this.#closeHistory()}>
                 <div class="preview-head">
-                    <strong id="history-title">Evidence history for ${h.person}</strong>
-                    <uui-button compact look="secondary" label="Close" @click=${this.#closeHistory}><uui-icon name="icon-wrong"></uui-icon></uui-button>
+                    <h3 id="history-title">Evidence history for ${h.person}</h3>
                 </div>
                 <div class="history-body">
                     ${h.events.length === 0
@@ -324,10 +323,9 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         return html`
             <dialog class="preview" data-modal aria-labelledby="preview-title" @close=${this.#closePreview} @click=${(e: Event) => e.target === e.currentTarget && this.#closePreview()}>
                 <div class="preview-head">
-                    <strong id="preview-title">Consent evidence</strong>
-                    <uui-button compact look="secondary" label="Close" @click=${this.#closePreview}><uui-icon name="icon-wrong"></uui-icon></uui-button>
+                    <h3 id="preview-title">Consent evidence</h3>
                 </div>
-                <div class="preview-body">
+                <div class="preview-body ${p.type === "application/pdf" || p.broken ? "" : "image"}">
                     ${p.broken
                         ? html`<p class="preview-broken">This file could not be previewed. It may be damaged. Use Download to check it, or upload a replacement.</p>`
                         : p.type === "application/pdf"
@@ -336,9 +334,12 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                 </div>
                 <div class="preview-foot">
                     <span class="muted">Opening or downloading this file is recorded in the audit log.</span>
-                    <uui-button class="action" look="primary" label="Download" @click=${this.#downloadPreview}>
-                        <uui-icon name="icon-download-alt"></uui-icon> Download
-                    </uui-button>
+                    <span class="foot-actions">
+                        <uui-button class="action" look="secondary" label="Close" @click=${this.#closePreview}>Close</uui-button>
+                        <uui-button class="action" look="primary" label="Download" @click=${this.#downloadPreview}>
+                            <uui-icon name="icon-download-alt"></uui-icon> Download
+                        </uui-button>
+                    </span>
                 </div>
             </dialog>
         `;
@@ -701,9 +702,12 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         dialog.preview::backdrop { background: rgba(0, 0, 0, 0.5); }
         .preview-head, .preview-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--uui-size-space-4); padding: var(--uui-size-space-4) var(--uui-size-space-5); }
         .preview-head { border-bottom: 1px solid var(--uui-color-border); }
+        .preview-head h3 { margin: 0; font-size: var(--uui-type-h5-size, 1.1rem); font-weight: 700; }
+        .foot-actions { display: flex; gap: var(--uui-size-space-3); flex-shrink: 0; }
         .preview-foot { border-top: 1px solid var(--uui-color-border); }
         .preview-body { display: flex; align-items: center; justify-content: center; background: var(--uui-color-surface-alt); min-height: 200px; max-height: 70vh; overflow: auto; }
-        .preview-body img { max-width: 100%; max-height: 70vh; object-fit: contain; }
+        .preview-body.image { padding: var(--uui-size-space-6); box-sizing: border-box; }
+        .preview-body img { max-width: 100%; max-height: calc(70vh - 2 * var(--uui-size-space-6)); object-fit: contain; }
         .preview-broken { margin: 0; padding: var(--uui-size-space-6); text-align: center; color: var(--uui-color-text-alt); }
         .preview-body iframe { width: 100%; height: 70vh; border: 0; }
         .save-state { margin-left: auto; color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
