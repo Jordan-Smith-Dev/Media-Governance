@@ -43,6 +43,8 @@ Then wrap any markup that shows a media item. Nothing is rendered when the image
 
 Use `key="@someGuid"` instead of `media` when you only have the media key.
 
+The Settings tab's **Hide withheld images in pages** switches this behaviour for the whole site. When it is off, the tag helper renders its content as normal (and still writes the log warning, so you can find the pages). `IMediaGovernanceUsage` always reports the true status.
+
 **Service.** For logic in controllers or views, inject `IMediaGovernanceUsage`:
 
 ```csharp
@@ -63,7 +65,7 @@ Limitations:
 
 Hiding an image in a page does not stop someone who already has its URL, or finds it through a search engine. So the package also stops **withheld** images being served: a request for the file of an Expired image, or an image of someone who has not consented, returns **404** to everyone except signed-in backoffice users (so editors can still see the image to fix it). Images that are not withheld are untouched, including resized (`?width=…`) requests.
 
-- On by default. To turn it off, set `Umbraco:Community:MediaGovernance:BlockWithheldMediaFiles` to `false` in `appsettings.json`.
+- On by default. Editors can turn it off with **Block withheld image files** in the dashboard's Settings tab (the *Front end* box). `Umbraco:Community:MediaGovernance:BlockWithheldMediaFiles` in `appsettings.json` sets the starting value; a choice saved in the Settings tab wins.
 - It only applies to images that have governance data (tagged people or dates). A newly installed site starts with everything allowed, and files become blocked as images are tagged and consent is missing or expires.
 - Each blocked request writes a log warning (de-duplicated), the same as the tag helper.
 - Status is cached for up to 30 seconds. Changes made in the dashboard apply immediately on the server where they were made; other servers in a load-balanced setup can lag by up to 30 seconds.

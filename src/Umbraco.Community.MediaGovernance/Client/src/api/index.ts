@@ -125,6 +125,10 @@ export type Settings = {
     warningDays: number;
     permittedUses: string[];
     notificationEmails: string[];
+    /** Withheld images' files return 404 to the public. */
+    blockWithheldFiles?: boolean | null;
+    /** The <media-governance> tag helper leaves withheld images out of pages. */
+    hideWithheldInPages?: boolean | null;
 };
 
 export class ApiError extends Error {

@@ -10,22 +10,24 @@ public class MediaGovernanceOptions
     /// <summary>
     /// When true (the default), requests for the file of an expired image, or an image of someone who has not
     /// consented, return 404 for everyone except signed-in backoffice users.
-    /// Set <c>Umbraco:Community:MediaGovernance:BlockWithheldMediaFiles</c> to false to turn this off.
+    /// This is the starting value. Once someone saves the front-end choice in the dashboard's Settings tab, that wins.
+    /// Set <c>Umbraco:Community:MediaGovernance:BlockWithheldMediaFiles</c> to false to start with it off.
     /// </summary>
     public bool BlockWithheldMediaFiles { get; set; } = true;
 }
 
 /// <summary>Stops withheld media files being served directly, so knowing or finding the URL is not enough.</summary>
-public class WithheldMediaFileMiddleware(RequestDelegate next, IOptions<MediaGovernanceOptions> options)
+public class WithheldMediaFileMiddleware(RequestDelegate next)
 {
     private static readonly PathString MediaRoot = new("/media");
 
-    public async Task InvokeAsync(HttpContext context, MediaFileGate gate)
+    public async Task InvokeAsync(HttpContext context, MediaFileGate gate, IFrontEndPolicyProvider policy)
     {
         var request = context.Request;
-        var isFileRequest = options.Value.BlockWithheldMediaFiles
-            && (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
-            && request.Path.StartsWithSegments(MediaRoot);
+        // Cheap checks first, so only requests for media files ever look up the setting.
+        var isFileRequest = (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+            && request.Path.StartsWithSegments(MediaRoot)
+            && (await policy.GetAsync()).BlockFiles;
 
         if (isFileRequest)
         {

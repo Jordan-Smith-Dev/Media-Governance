@@ -22,6 +22,8 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
     @state() private _days = "90";
     @state() private _uses = "";
     @state() private _emails = "";
+    @state() private _blockFiles = true;
+    @state() private _hidePages = true;
     @state() private _loaded = false;
     @state() private _error = "";
     @state() private _saving = false;
@@ -39,6 +41,8 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
             this._days = String(s.warningDays);
             this._uses = s.permittedUses.join(", ");
             this._emails = s.notificationEmails.join("\n");
+            this._blockFiles = s.blockWithheldFiles ?? true;
+            this._hidePages = s.hideWithheldInPages ?? true;
             this._baseline = this.#snapshot();
             this._loaded = true;
         } catch (e) {
@@ -47,7 +51,7 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
     }
 
     #snapshot() {
-        return JSON.stringify([this._years, this._days, splitList(this._uses), splitList(this._emails)]);
+        return JSON.stringify([this._years, this._days, splitList(this._uses), splitList(this._emails), this._blockFiles, this._hidePages]);
     }
 
     get #dirty() {
@@ -112,6 +116,8 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
                 warningDays: Number(this._days),
                 permittedUses: splitList(this._uses),
                 notificationEmails: splitList(this._emails),
+                blockWithheldFiles: this._blockFiles,
+                hideWithheldInPages: this._hidePages,
             });
             await this.#load();
             this.notify("positive", "Settings saved");
@@ -180,6 +186,24 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
                     </umb-property-layout>
                 </uui-box>
 
+                <uui-box headline="Front end (your public website)">
+                    <umb-property-layout label="Hide withheld images in pages" description="Applies to markup wrapped in the <media-governance> tag helper. When on, an image that has Expired or has no consent is left out of the page. When off, it still shows (and is still written to the log, so you can find the page).">
+                        <div slot="editor" class="field">
+                            <uui-toggle label="Hide withheld images in pages" .checked=${this._hidePages} @change=${(e: Event) => (this._hidePages = (e.target as HTMLInputElement).checked)}>
+                                ${this._hidePages ? "Hidden" : "Still shown"}
+                            </uui-toggle>
+                        </div>
+                    </umb-property-layout>
+                    <umb-property-layout label="Block withheld image files" description="When on, anyone requesting the file of an Expired image, or an image of someone without consent, gets a 404, even if they have the address. Signed-in editors can still see it. When off, only pages are affected.">
+                        <div slot="editor" class="field">
+                            <uui-toggle label="Block withheld image files" .checked=${this._blockFiles} @change=${(e: Event) => (this._blockFiles = (e.target as HTMLInputElement).checked)}>
+                                ${this._blockFiles ? "Blocked" : "Still served"}
+                            </uui-toggle>
+                            ${!this._blockFiles ? html`<span class="warn">Withheld images can still be reached by their address, and may still appear in search engines.</span>` : nothing}
+                        </div>
+                    </umb-property-layout>
+                </uui-box>
+
                 <uui-box headline="Notifications">
                     <umb-property-layout label="Recipients" description="Email addresses that get a daily digest when images need attention. One per line. Leave empty to send nothing.">
                         <div slot="editor" class="field">
@@ -213,6 +237,7 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         .with-unit uui-input { width: 120px; }
         .with-unit span { color: var(--uui-color-text-alt); }
         .chips { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-2); }
+        .warn { color: var(--uui-color-warning-standalone, #b45309); font-size: var(--uui-type-small-size); }
         .muted { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
         .error { color: var(--uui-color-danger-standalone); font-size: var(--uui-type-small-size); }
         .example { margin-top: var(--uui-size-space-5); padding: var(--uui-size-space-4) var(--uui-size-space-5); background: var(--uui-color-surface-alt); border-left: 3px solid var(--uui-color-interactive); border-radius: var(--uui-border-radius); }

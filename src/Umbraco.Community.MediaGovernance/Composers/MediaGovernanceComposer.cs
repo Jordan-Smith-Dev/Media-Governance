@@ -57,6 +57,7 @@ namespace Umbraco.Community.MediaGovernance.Composers
             s.AddSingleton<MediaGateCache>();
             s.AddScoped<IMediaFileIndex, MediaFileIndex>();
             s.AddScoped<MediaFileGate>();
+            s.AddScoped<IFrontEndPolicyProvider, FrontEndPolicyProvider>();
             s.Configure<UmbracoPipelineOptions>(options =>
                 options.AddFilter(new UmbracoPipelineFilter("MediaGovernance")
                 {

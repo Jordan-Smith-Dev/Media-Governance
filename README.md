@@ -34,10 +34,12 @@ Access follows Umbraco's **Media section** permission. Any user who can open the
 | Warning window (days) | 90 | How far ahead an image shows as *Expiring soon* |
 | Permitted uses | Web, Print, Social, Marketing, Other | The list offered when recording a consent |
 | Notification emails | none | Who receives the daily digest |
+| Hide withheld images in pages | On | The `<media-governance>` tag helper leaves out images that are Expired or have no consent. Off: they still show, and are still logged |
+| Block withheld image files | On | Requests for the file of a withheld image return 404 to the public (signed-in editors can still see it). Off: only pages are affected |
 
 ### In `appsettings.json`
 
-Only one option, under `Umbraco:Community:MediaGovernance`:
+One optional setting, under `Umbraco:Community:MediaGovernance`. It is only the **starting value** for *Block withheld image files*: once someone saves that choice in the Settings tab, the Settings tab wins.
 
 ```json
 {
@@ -51,7 +53,7 @@ Only one option, under `Umbraco:Community:MediaGovernance`:
 }
 ```
 
-`BlockWithheldMediaFiles` (default `true`): a request for the file of an Expired image, or an image of someone who has not consented, returns 404 to everyone except signed-in backoffice users. Set `false` to only flag images and not block files.
+`BlockWithheldMediaFiles` (default `true`): a request for the file of an Expired image, or an image of someone who has not consented, returns 404 to everyone except signed-in backoffice users. Set `false` to start with blocking off. Changes made in the Settings tab apply within about 30 seconds.
 
 ### Email
 
@@ -63,7 +65,7 @@ Consent evidence (PDF, PNG, JPG, up to 10 MB) is stored on disk at `umbraco/Data
 
 ### Before you go live on an existing site
 
-Images with no dates and an upload date older than the retention period will show as Expired, be hidden by the tag helper and (unless you turn blocking off) have their files return 404. Either set `BlockWithheldMediaFiles` to `false` first, or review the dashboard, bulk-mark images as having no people, and set a longer retention before enabling it. Use the **Expired** and **Needs tagging** filters and the bulk actions to work through the backlog.
+Images with no dates and an upload date older than the retention period will show as Expired, be hidden by the tag helper and (unless you turn blocking off) have their files return 404. Either turn off *Block withheld image files* (and, if you wish, *Hide withheld images in pages*) in the Settings tab first, or review the dashboard, bulk-mark images as having no people, and set a longer retention before enabling it. Use the **Expired** and **Needs tagging** filters and the bulk actions to work through the backlog.
 
 ## 4. Use it on the website
 

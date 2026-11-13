@@ -30,7 +30,8 @@ public class ImageController(
     IMediaUploadDates uploads,
     TimeProvider time,
     Umbraco.Cms.Core.Services.IUserService users,
-    IBackOfficeSecurityAccessor security) : GovernanceControllerBase(security)
+    IBackOfficeSecurityAccessor security,
+    Microsoft.Extensions.Options.IOptions<Umbraco.Community.MediaGovernance.Middleware.MediaGovernanceOptions> appSettings) : GovernanceControllerBase(security)
 {
     private const long MaxUploadBytes = EvidenceStore.MaxBytes + 1024;
 
@@ -210,7 +211,7 @@ public class ImageController(
 
     [HttpGet("settings")]
     [ProducesResponseType(typeof(GovernanceOptions), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetSettings() => Ok(await settings.GetAsync());
+    public async Task<IActionResult> GetSettings() => Ok(WithEffectiveFrontEnd(await settings.GetAsync()));
 
     [HttpPut("settings")]
     [ProducesResponseType(typeof(GovernanceOptions), StatusCodes.Status200OK)]
@@ -222,13 +223,20 @@ public class ImageController(
             var saved = await settings.SaveAsync(options);
             gateCache.Clear();
             await audit.WriteAsync(Actor, "settings.updated",
-                detail: $"retentionYears={saved.RetentionYears}, warningDays={saved.WarningDays}, recipients={saved.NotificationEmails.Count}");
-            return Ok(saved);
+                detail: $"retentionYears={saved.RetentionYears}, warningDays={saved.WarningDays}, recipients={saved.NotificationEmails.Count}, blockFiles={saved.BlockWithheldFiles?.ToString() ?? "default"}, hidePages={saved.HideWithheldInPages?.ToString() ?? "default"}");
+            return Ok(WithEffectiveFrontEnd(saved));
         }
         catch (ArgumentException ex)
         {
             return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
+    }
+
+    /// <summary>Fills in the front-end choices still on their default, so the dashboard always shows what is really happening.</summary>
+    private GovernanceOptions WithEffectiveFrontEnd(GovernanceOptions saved)
+    {
+        var policy = FrontEndPolicy.Resolve(saved, appSettings.Value.BlockWithheldMediaFiles);
+        return saved with { BlockWithheldFiles = policy.BlockFiles, HideWithheldInPages = policy.HidePages };
     }
 
     private async Task<ImageGovernanceDto> BuildAsync(Guid mediaKey)

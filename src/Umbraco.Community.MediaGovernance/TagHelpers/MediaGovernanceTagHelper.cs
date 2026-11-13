@@ -29,7 +29,8 @@ public enum UsageDisplay
 public class MediaGovernanceTagHelper(
     IMediaGovernanceUsage usage,
     IWithheldMediaReporter reporter,
-    IHttpContextAccessor httpContext) : TagHelper
+    IHttpContextAccessor httpContext,
+    IFrontEndPolicyProvider policy) : TagHelper
 {
     /// <summary>The media item (use this or <see cref="Key"/>).</summary>
     [HtmlAttributeName("media")]
@@ -50,10 +51,12 @@ public class MediaGovernanceTagHelper(
         output.TagName = null; // no wrapper element in the page
 
         var status = await usage.GetStatusAsync(key);
-        var usable = UsagePolicy.IsUsable(status);
-        if (!usable)
+        var withheld = !UsagePolicy.IsUsable(status);
+        if (withheld)
             reporter.Report(key, status, httpContext.HttpContext?.Request.Path.Value);
 
+        // When the site has chosen not to hide withheld images, they show as normal (and are still logged above).
+        var usable = !withheld || !(await policy.GetAsync()).HidePages;
         if ((Show == UsageDisplay.Usable) != usable)
             output.SuppressOutput();
     }

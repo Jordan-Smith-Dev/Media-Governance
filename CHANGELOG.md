@@ -22,6 +22,7 @@ First version: Phase 1, media compliance.
 - Pages affected tab, changes saved immediately, a fixed "Given by" list, settings validation and a custom calendar.
 - Icons on action buttons; Remove is red. Dark mode checked.
 - 239 unit tests and 28 browser tests.
+- Settings tab: a *Front end* box with two switches, *Hide withheld images in pages* (the tag helper) and *Block withheld image files* (404 for the file). The appsettings option is now only the starting value for file blocking.
 - Front-end helpers: a `<media-governance>` tag helper and an `IMediaGovernanceUsage` service so templates can leave out expired images and images without consent. Withheld images are written to the Umbraco log as warnings (de-duplicated) with the page path, so affected pages can be found.
 
 Differences from the design prototype:

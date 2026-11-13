@@ -136,10 +136,31 @@ public class MediaGovernanceTagHelperTests
         return output;
     }
 
+    private class FakePolicy(bool hidePages = true) : IFrontEndPolicyProvider
+    {
+        public Task<FrontEndPolicy> GetAsync() => Task.FromResult(new FrontEndPolicy(true, hidePages));
+    }
+
     private readonly FakeReporter _reporter = new();
 
-    private MediaGovernanceTagHelper Helper(GovernanceStatus status, UsageDisplay show = UsageDisplay.Usable, string? path = "/news/article") =>
-        new(new FakeUsage(status), _reporter, new FakeHttpContextAccessor(path)) { Key = Guid.NewGuid(), Show = show };
+    private MediaGovernanceTagHelper Helper(GovernanceStatus status, UsageDisplay show = UsageDisplay.Usable, string? path = "/news/article", bool hidePages = true) =>
+        new(new FakeUsage(status), _reporter, new FakeHttpContextAccessor(path), new FakePolicy(hidePages)) { Key = Guid.NewGuid(), Show = show };
+
+    [Fact]
+    public async Task When_the_site_chooses_not_to_hide_withheld_images_they_still_show_but_are_logged()
+    {
+        var output = await Run(Helper(GovernanceStatus.Expired, hidePages: false));
+        Assert.False(output.IsContentModified);
+        Assert.Single(_reporter.Reports);
+    }
+
+    [Fact]
+    public async Task When_not_hiding_the_fallback_is_not_shown_either()
+    {
+        var output = await Run(Helper(GovernanceStatus.Expired, UsageDisplay.Unusable, hidePages: false));
+        Assert.True(output.Content.IsEmptyOrWhiteSpace);
+        Assert.True(output.IsContentModified);
+    }
 
     [Fact]
     public async Task Usable_image_renders_its_content_without_a_wrapper_element()
@@ -201,7 +222,7 @@ public class MediaGovernanceTagHelperTests
     [Fact]
     public async Task Missing_key_is_a_developer_error_not_a_silent_pass() =>
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            Run(new MediaGovernanceTagHelper(new FakeUsage(GovernanceStatus.Compliant), _reporter, new FakeHttpContextAccessor("/"))));
+            Run(new MediaGovernanceTagHelper(new FakeUsage(GovernanceStatus.Compliant), _reporter, new FakeHttpContextAccessor("/"), new FakePolicy())));
 }
 
 internal class MutableTimeProvider(DateTimeOffset start) : TimeProvider

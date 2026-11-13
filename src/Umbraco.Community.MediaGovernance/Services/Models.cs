@@ -28,7 +28,9 @@ public record GovernanceOptions(
     int RetentionYears,
     int WarningDays,
     IReadOnlyList<string> PermittedUses,
-    IReadOnlyList<string> NotificationEmails)
+    IReadOnlyList<string> NotificationEmails,
+    bool? BlockWithheldFiles = null,
+    bool? HideWithheldInPages = null)
 {
     public GovernanceSettings ToCore() => new(RetentionYears, WarningDays);
 
