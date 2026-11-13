@@ -27,7 +27,7 @@ public class NotificationService(
         {
             try
             {
-                await email.SendAsync(new EmailMessage(from, to, "Media governance: images need attention", body, true), "MediaGovernance");
+                await email.SendAsync(new EmailMessage(from, to, "Media governance: images need attention", body, true), "MediaGovernance", false, TimeSpan.FromHours(24));   // a digest is stale after a day
                 sent++;
             }
             catch (Exception ex)
