@@ -11,7 +11,7 @@ First version: Phase 1, media compliance.
 - Configurable retention and warning window; daily email digest.
 - Withheld media files (expired, or without consent) return 404 to the public, so knowing or finding the URL is not enough. Signed-in backoffice users are exempt. On by default; `Umbraco:Community:MediaGovernance:BlockWithheldMediaFiles` turns it off.
 - Retention starts from date taken, then date obtained, then the upload date, so undated and older images still expire.
-- The daily email now also covers images that need tagging.
+- The daily email now also covers images that need tagging, and each image links to its Governance tab (plus a link to the dashboard) when the site's address is known.
 - Media folders show a red or amber marker when they contain images that cannot be used or need attention. Image icons in the tree are coloured by status.
 - Dashboard: row selection, consent shown as solid green and red pills, "No people" and "Not tagged yet" wording.
 - One Export button: exports the ticked images, or everything matching the current filter when none are ticked.

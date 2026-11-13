@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Configuration.Models;
+using Umbraco.Cms.Core.Hosting;
 using Umbraco.Cms.Core.Mail;
 using Umbraco.Cms.Core.Models.Email;
 using Umbraco.Community.MediaGovernance.Jobs;
@@ -12,6 +13,7 @@ public class NotificationService(
     ISettingsService settings,
     IEmailSender email,
     IOptions<GlobalSettings> global,
+    IHostingEnvironment hosting,
     ILogger<NotificationService> logger)
 {
     public async Task<bool> SendAsync(IReadOnlyList<Transition> transitions, IReadOnlyDictionary<Guid, string> names)
@@ -20,7 +22,7 @@ public class NotificationService(
         if (transitions.Count == 0 || options.NotificationEmails.Count == 0 || !email.CanSendRequiredEmail())
             return false;
 
-        var body = DigestBuilder.Build(transitions, names);
+        var body = DigestBuilder.Build(transitions, names, hosting.ApplicationMainUrl);
         var from = global.Value.Smtp?.From ?? "noreply@localhost";
         var sent = 0;
         foreach (var to in options.NotificationEmails)

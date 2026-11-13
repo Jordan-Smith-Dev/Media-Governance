@@ -55,7 +55,7 @@ Only one option, under `Umbraco:Community:MediaGovernance`:
 
 ### Email
 
-The daily digest uses Umbraco's normal email settings, so configure `Umbraco:CMS:Global:Smtp` (host, port, from address) as for any Umbraco site. If email is not configured, or no recipients are set, no digest is sent and nothing else is affected. It runs once every 24 hours (first run two minutes after startup) on the scheduling server only.
+The daily digest uses Umbraco's normal email settings, so configure `Umbraco:CMS:Global:Smtp` (host, port, from address) as for any Umbraco site. If email is not configured, or no recipients are set, no digest is sent and nothing else is affected. Each image in the email links straight to its Governance tab, with a link to the dashboard at the end. The links use the site's address, which Umbraco learns from its first request, or you can set it with `Umbraco:CMS:WebRouting:UmbracoApplicationUrl` (recommended for scheduled emails, e.g. `https://www.example.com`). Until it is known, names appear as plain text. It runs once every 24 hours (first run two minutes after startup) on the scheduling server only.
 
 ### Evidence files
 

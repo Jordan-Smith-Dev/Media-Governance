@@ -62,6 +62,23 @@ public class DigestBuilderTests
     }
 
     [Fact]
+    public void With_a_site_address_each_name_links_to_its_governance_tab()
+    {
+        var key = Guid.NewGuid();
+        var html = DigestBuilder.Build([new Transition(key, GovernanceStatus.Expired)], new Dictionary<Guid, string> { [key] = "Aerial" }, new Uri("https://example.com/"));
+        Assert.Contains($"<a href=\"https://example.com/umbraco/section/media/workspace/media/edit/{key}/invariant/view/governance\">Aerial</a>", html);
+        Assert.Contains("href=\"https://example.com/umbraco/section/media\"", html);
+    }
+
+    [Fact]
+    public void Without_a_site_address_names_are_plain_text()
+    {
+        var (t, n) = Make(("Aerial", GovernanceStatus.Expired));
+        var html = DigestBuilder.Build(t, n);
+        Assert.DoesNotContain("<a ", html);
+    }
+
+    [Fact]
     public void An_unknown_image_falls_back_to_its_key()
     {
         var key = Guid.NewGuid();
