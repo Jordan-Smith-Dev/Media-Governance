@@ -7,6 +7,9 @@ test.beforeEach(async ({ page }) => {
 
 test("Governance in the Media sidebar opens the page, with a Log Viewer style header", async ({ page }) => {
     await page.goto("/umbraco/section/media");
+    // Wait for the sidebar to finish loading (Umbraco redirects the section once it has), then open Governance.
+    await expect(page.getByText("Recycle Bin")).toBeVisible();
+    await page.waitForURL(/\/umbraco\/section\/media/);
     await page.getByText("Governance", { exact: true }).first().click();
     await expect(page).toHaveURL(new RegExp(`${GOVERNANCE}`));
 
