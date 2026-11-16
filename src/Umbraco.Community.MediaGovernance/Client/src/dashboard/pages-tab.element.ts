@@ -6,9 +6,13 @@ import { STATUS_COLORS } from "./format.js";
 /** Images shown per page before the rest collapse into a "+N" tag with a tooltip, like the overview. */
 const MAX_IMAGES_SHOWN = 3;
 
+/** Pages shown at a time; the rest appear on request. */
+const PAGE_SIZE = 50;
+
 @customElement("umb-media-governance-pages")
 export class MediaGovernancePagesElement extends GovernanceElement {
     @state() private _pages: AffectedPage[] = [];
+    @state() private _shown = PAGE_SIZE;
     @state() private _loading = true;
     @state() private _error = "";
 
@@ -54,7 +58,7 @@ export class MediaGovernancePagesElement extends GovernanceElement {
                               <uui-table-head-cell>State</uui-table-head-cell>
                               <uui-table-head-cell>Withheld images on this page</uui-table-head-cell>
                           </uui-table-head>
-                          ${this._pages.map(
+                          ${this._pages.slice(0, this._shown).map(
                               (p) => html`
                                   <uui-table-row>
                                       <uui-table-cell>
@@ -72,7 +76,7 @@ export class MediaGovernancePagesElement extends GovernanceElement {
                                                   (i) => html`
                                                       <a class="image" href="/umbraco/section/media/workspace/media/edit/${i.mediaKey}/invariant/view/governance">
                                                           <span>${i.name}</span>
-                                                          <uui-tag color=${STATUS_COLORS[i.status]} title=${STATUS_HELP[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
+                                                          <uui-tag class="pill" color=${STATUS_COLORS[i.status]} title=${STATUS_HELP[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
                                                       </a>
                                                   `
                                               )}
@@ -89,7 +93,12 @@ export class MediaGovernancePagesElement extends GovernanceElement {
                               `
                           )}
                       </uui-table>
-                      <div class="footer">${this._pages.length} ${this._pages.length === 1 ? "page" : "pages"} affected</div>
+                      <div class="footer">
+                          ${this._pages.length > this._shown
+                              ? html`<uui-button class="action" label="Show more pages" look="secondary" @click=${() => (this._shown += PAGE_SIZE)}>Show more</uui-button>`
+                              : nothing}
+                          <span>Showing ${Math.min(this._shown, this._pages.length)} of ${this._pages.length} ${this._pages.length === 1 ? "page" : "pages"} affected</span>
+                      </div>
                   `}
             <div class="note">
                 <uui-icon name="icon-info"></uui-icon>
@@ -104,6 +113,7 @@ export class MediaGovernancePagesElement extends GovernanceElement {
 
     static override styles = css`
         :host { display: block; padding: var(--uui-size-layout-1); }
+        .pill { width: 7rem; justify-content: center; text-align: center; }
         .intro { margin: 0 0 var(--uui-size-space-5); color: var(--uui-color-text-alt); }
         .muted { color: var(--uui-color-text-alt); }
         .pages uui-table-cell, .pages uui-table-head-cell { padding: var(--uui-size-space-4) var(--uui-size-space-5); vertical-align: middle; }

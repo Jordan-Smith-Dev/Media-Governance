@@ -5,9 +5,13 @@ import { GovernanceElement, errorMessage } from "../api/governance-element.js";
 import type { Person } from "../api/index.js";
 import { MEDIA_GOVERNANCE_PERSON_MODAL } from "./person-modal.token.js";
 
+/** People fetched per request; more load on demand, like the overview. */
+const PAGE_SIZE = 50;
+
 @customElement("umb-media-governance-people")
 export class MediaGovernancePeopleElement extends GovernanceElement {
     @state() private _people: Person[] = [];
+    @state() private _total = 0;
     @state() private _query = "";
     @state() private _loading = true;
     @state() private _error = "";
@@ -20,11 +24,13 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
         void this.#load();
     }
 
-    async #load() {
+    async #load(append = false) {
         this._loading = true;
         this._error = "";
         try {
-            this._people = await this.api.people(this._query);
+            const page = await this.api.people(this._query, append ? this._people.length : 0, PAGE_SIZE);
+            this._people = append ? [...this._people, ...page.items] : page.items;
+            this._total = page.total;
             const focus = this._people.find((p) => p.id === this.#focusId);
             if (focus) {
                 this.#focusId = "";
@@ -107,7 +113,7 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
                             <uui-table-cell>${p.jobTitle ?? "—"}</uui-table-cell>
                             <uui-table-cell>${p.email ?? "—"}</uui-table-cell>
                             <uui-table-cell>
-                                <uui-tag look="primary" color=${p.consentGiven ? "positive" : "danger"}>${p.consentGiven ? "Consent given" : "No consent"}</uui-tag>
+                                <uui-tag class="pill" look="primary" color=${p.consentGiven ? "positive" : "danger"}>${p.consentGiven ? "Consent given" : "No consent"}</uui-tag>
                             </uui-table-cell>
                             <uui-table-cell>
                                 ${p.linkedMemberKey ? html`<uui-tag>Member</uui-tag>` : nothing}
@@ -125,6 +131,12 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
                     `
                 )}
             </uui-table>
+            <div class="footer">
+                ${this._people.length < this._total
+                    ? html`<uui-button class="action" label="Load more" look="secondary" ?disabled=${this._loading} @click=${() => this.#load(true)}>Load more</uui-button>`
+                    : nothing}
+                <span class="muted">Showing ${this._people.length} of ${this._total} ${this._total === 1 ? "person" : "people"}</span>
+            </div>
         `;
     }
 
@@ -135,7 +147,9 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
         .actions { white-space: nowrap; }
         .action-buttons { display: flex; align-items: center; justify-content: flex-end; gap: var(--uui-size-space-2); }
         .name { --uui-button-padding-left-factor: 0; --uui-button-font-weight: 600; }
-        .empty { color: var(--uui-color-text-alt); }
+        .pill { width: 8rem; justify-content: center; text-align: center; }
+        .empty, .muted { color: var(--uui-color-text-alt); }
+        .footer { display: flex; align-items: center; gap: var(--uui-size-space-4); margin-top: var(--uui-size-space-4); }
     `];
 }
 

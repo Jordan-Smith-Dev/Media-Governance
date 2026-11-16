@@ -1,8 +1,7 @@
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UMB_MEDIA_WORKSPACE_CONTEXT } from "@umbraco-cms/backoffice/media";
-import "../components/date-input.element.js";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
-import type { ImageGovernance, Person } from "../api/index.js";
+import type { ImageGovernance, Person, TaggedPerson } from "../api/index.js";
 import { daysUntil, formatDate, relativeTime } from "../dashboard/format.js";
 
 const MAX_SUGGESTIONS = 8;
@@ -14,7 +13,11 @@ const personHref = (id: string) => `/umbraco/section/media/workspace/media-gover
 export class MediaGovernanceImageViewElement extends GovernanceElement {
     @state() private _mediaKey = "";
     @state() private _data?: ImageGovernance;
-    @state() private _people: Person[] = [];
+    @state() private _suggestions: Person[] = [];
+    @state() private _suggestionTotal = 0;
+    /** Who is tagged: from the server, plus anyone just added (so a chip shows before the save returns). */
+    #known = new Map<string, TaggedPerson>();
+    #searchTimer?: number;
     @state() private _error = "";
     @state() private _saveState: "idle" | "saving" | "saved" = "idle";
     @state() private _personSearch = "";
@@ -36,12 +39,34 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     async #load() {
         this._error = "";
         try {
-            const [data, people] = await Promise.all([this.api.image(this._mediaKey), this.api.people()]);
+            const data = await this.api.image(this._mediaKey);
+            this.#remember(data);
             this._data = data;
-            this._people = people;
+            await this.#search();
         } catch (e) {
             this._error = errorMessage(e);
         }
+    }
+
+    #remember(data: ImageGovernance) {
+        for (const p of data.people) this.#known.set(p.personId, p);
+    }
+
+    /** Looks people up as the editor types, a few at a time: there can be thousands, so they are never all loaded. */
+    async #search() {
+        try {
+            const page = await this.api.people(this._personSearch.trim(), 0, MAX_SUGGESTIONS + 20);
+            this._suggestions = page.items;
+            this._suggestionTotal = page.total;
+        } catch (e) {
+            this._error = errorMessage(e);
+        }
+    }
+
+    #onSearch(e: Event) {
+        this._personSearch = (e.target as HTMLInputElement).value;
+        window.clearTimeout(this.#searchTimer);
+        this.#searchTimer = window.setTimeout(() => void this.#search(), 250);
     }
 
     /** Applies a change and saves it immediately, so the only Save button in the UI is Umbraco's own. */
@@ -52,7 +77,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     }
 
     #date(field: "dateTaken" | "dateObtained", e: Event) {
-        const value = (e as CustomEvent<string>).detail;
+        const value = (e.target as HTMLInputElement).value;
         this.#patch({ [field]: value || null });
     }
 
@@ -63,14 +88,16 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     #expiry(e: Event) {
         const d = this._data;
         if (!d) return;
-        const value = (e as CustomEvent<string>).detail;
+        const value = (e.target as HTMLInputElement).value;
         this.#patch({ customExpiry: !value || value === d.defaultExpiry ? null : value });
     }
 
-    #addPerson(id: string) {
-        if (!this._data || this._data.taggedPersonIds.includes(id)) return;
-        this.#patch({ taggedPersonIds: [...this._data.taggedPersonIds, id], noPeople: false });
+    #addPerson(person: Person) {
+        if (!this._data || this._data.taggedPersonIds.includes(person.id)) return;
+        this.#known.set(person.id, { personId: person.id, name: person.name, consentGiven: person.consentGiven });
+        this.#patch({ taggedPersonIds: [...this._data.taggedPersonIds, person.id], noPeople: false });
         this._personSearch = "";
+        void this.#search();
     }
 
     #removePerson(id: string) {
@@ -93,6 +120,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                     taggedPersonIds: d.taggedPersonIds,
                 });
                 // Keep the status and expiry fresh; keep what the user has typed since this save started.
+                this.#remember(saved);
                 const current = this._data;
                 this._data = current
                     ? { ...saved, dateTaken: current.dateTaken, dateObtained: current.dateObtained, customExpiry: current.customExpiry, noPeople: current.noPeople, taggedPersonIds: current.taggedPersonIds }
@@ -109,10 +137,6 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         return this.#pending;
     }
 
-    #person(id: string): Person | undefined {
-        return this._people.find((p) => p.id === id);
-    }
-
     override render() {
         if (this._error) return html`<div class="wrap"><uui-tag color="danger">${this._error}</uui-tag></div>`;
         const d = this._data;
@@ -122,7 +146,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
             <div class="wrap">
                 <uui-box headline="Image details">
                     <umb-property-layout label="Date taken" description=${this.#dateTakenHint(d)}>
-                        <umb-media-governance-date-input slot="editor" label="Date taken" .value=${d.dateTaken ?? ""} @change=${(e: Event) => this.#date("dateTaken", e)}></umb-media-governance-date-input>
+                        <umb-input-date slot="editor" type="date" label="Date taken" .value=${d.dateTaken ?? ""} @change=${(e: Event) => this.#date("dateTaken", e)}></umb-input-date>
                         ${!d.dateTaken && d.exifDateTaken
                             ? html`<uui-button slot="editor" look="secondary" compact label="Use the date from the photo" @click=${() => this.#patch({ dateTaken: d.exifDateTaken })}>
                                   Use ${formatDate(d.exifDateTaken)} from the photo's camera data
@@ -130,11 +154,11 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                             : nothing}
                     </umb-property-layout>
                     <umb-property-layout label="Date obtained" description="Used when the date taken is not known.">
-                        <umb-media-governance-date-input slot="editor" label="Date obtained" .value=${d.dateObtained ?? ""} @change=${(e: Event) => this.#date("dateObtained", e)}></umb-media-governance-date-input>
+                        <umb-input-date slot="editor" type="date" label="Date obtained" .value=${d.dateObtained ?? ""} @change=${(e: Event) => this.#date("dateObtained", e)}></umb-input-date>
                     </umb-property-layout>
                     <umb-property-layout label="Expiry" description=${this.#expiryHint(d)}>
                         <div slot="editor" class="expiry">
-                            <umb-media-governance-date-input label="Expiry" .value=${d.effectiveExpiry ?? ""} @change=${this.#expiry}></umb-media-governance-date-input>
+                            <umb-input-date type="date" label="Expiry" .value=${d.effectiveExpiry ?? ""} @change=${this.#expiry}></umb-input-date>
                             ${this.#renderExpiredIndicator(d)}
                         </div>
                     </umb-property-layout>
@@ -179,15 +203,14 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     }
 
     #renderPeoplePicker(d: ImageGovernance) {
-        const available = this._people.filter((p) => !d.taggedPersonIds.includes(p.id));
-        const term = this._personSearch.trim().toLowerCase();
-        const matches = available.filter((p) => !term || p.name.toLowerCase().includes(term));
+        const matches = this._suggestions.filter((p) => !d.taggedPersonIds.includes(p.id));
+        const hidden = Math.max(0, this._suggestionTotal - d.taggedPersonIds.length - Math.min(matches.length, MAX_SUGGESTIONS));
 
         return html`
             <div class="tags">
                 ${d.taggedPersonIds.length === 0 ? html`<span class="muted">No one tagged yet.</span>` : nothing}
                 ${d.taggedPersonIds.map((id) => {
-                    const p = this.#person(id);
+                    const p = this.#known.get(id);
                     const given = p?.consentGiven ?? false;
                     return html`
                         <uui-tag class="person" color=${given ? "positive" : "danger"} look="primary" title=${given ? "Has given consent" : "Has not given consent"}>
@@ -203,20 +226,18 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                 })}
             </div>
 
-            ${available.length === 0
-                ? html`<span class="muted">${this._people.length === 0 ? "No people exist yet. Add them in Governance, People." : "Everyone is already tagged."}</span>`
-                : html`
-                      <uui-input label="Search people to tag" placeholder="Search people to tag..." .value=${this._personSearch} @input=${(e: Event) => (this._personSearch = (e.target as HTMLInputElement).value)}></uui-input>
-                      <div class="suggestions">
-                          ${matches.slice(0, MAX_SUGGESTIONS).map(
-                              (p) => html`<uui-button look="outline" compact label="Tag ${p.name}" @click=${() => this.#addPerson(p.id)}>
-                                  <uui-icon name="icon-add"></uui-icon> ${p.name}
-                              </uui-button>`
-                          )}
-                          ${matches.length === 0 ? html`<span class="muted">No one matches.</span>` : nothing}
-                          ${matches.length > MAX_SUGGESTIONS ? html`<span class="muted">+${matches.length - MAX_SUGGESTIONS} more, keep typing to narrow the list.</span>` : nothing}
-                      </div>
-                  `}
+            <uui-input label="Search people to tag" placeholder="Search people to tag..." .value=${this._personSearch} @input=${this.#onSearch}></uui-input>
+            <div class="suggestions">
+                ${matches.slice(0, MAX_SUGGESTIONS).map(
+                    (p) => html`<uui-button look="outline" compact label="Tag ${p.name}" @click=${() => this.#addPerson(p)}>
+                        <uui-icon name="icon-add"></uui-icon> ${p.name}
+                    </uui-button>`
+                )}
+                ${matches.length === 0
+                    ? html`<span class="muted">${this._personSearch.trim() ? "No one matches." : this._suggestionTotal === 0 ? "No people exist yet. Add them in Governance, People." : "Everyone is already tagged."}</span>`
+                    : nothing}
+                ${hidden > 0 ? html`<span class="muted">+${hidden} more, keep typing to narrow the list.</span>` : nothing}
+            </div>
         `;
     }
 

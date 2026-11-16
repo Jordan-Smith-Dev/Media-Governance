@@ -8,6 +8,8 @@ import { GovernanceApi, STATUS_LABELS, type PersonImage, type PersonRequest } fr
 import { STATUS_COLORS, formatDate } from "./format.js";
 import type { PersonModalData, PersonModalValue } from "./person-modal.token.js";
 
+const IMAGE_PAGE_SIZE = 25;
+
 const EMPTY: PersonRequest = { name: "", email: null, phone: null, linkedMemberKey: null, linkedUserKey: null, jobTitle: null };
 
 const imageHref = (key: string) => `/umbraco/section/media/workspace/media/edit/${key}/invariant/view/governance`;
@@ -21,6 +23,7 @@ export class MediaGovernancePersonModalElement extends UmbModalBaseElement<Perso
     @state() private _form: PersonRequest = { ...EMPTY };
     @state() private _consent = false;
     @state() private _images: PersonImage[] = [];
+    @state() private _imageTotal = 0;
     #originalConsent = false;
     #changed = false;
 
@@ -35,7 +38,18 @@ export class MediaGovernancePersonModalElement extends UmbModalBaseElement<Perso
         if (person) {
             this._form = { ...person };
             this._consent = this.#originalConsent = person.consentGiven;
-            void this.#api.personImages(person.id).then((i) => (this._images = i)).catch((e) => this.#notify("danger", errorMessage(e)));
+            void this.#loadImages(person.id);
+        }
+    }
+
+    /** The images are fetched a page at a time: a person can be tagged in hundreds. */
+    async #loadImages(personId: string, append = false) {
+        try {
+            const page = await this.#api.personImages(personId, append ? this._images.length : 0, IMAGE_PAGE_SIZE);
+            this._images = append ? [...this._images, ...page.items] : page.items;
+            this._imageTotal = page.total;
+        } catch (e) {
+            this.#notify("danger", errorMessage(e));
         }
     }
 
@@ -127,18 +141,24 @@ export class MediaGovernancePersonModalElement extends UmbModalBaseElement<Perso
 
                 ${person
                     ? html`
-                          <uui-box headline="Tagged in ${this._images.length} ${this._images.length === 1 ? "image" : "images"}">
-                              ${this._images.length === 0
+                          <uui-box headline="Tagged in ${this._imageTotal} ${this._imageTotal === 1 ? "image" : "images"}">
+                              ${this._imageTotal === 0
                                   ? html`<p class="muted">Not tagged in any image yet. Tag them from an image's Governance tab.</p>`
                                   : html`<ul class="images">
                                         ${this._images.map(
                                             (i) => html`<li>
                                                 <a href=${imageHref(i.mediaKey)}>${i.name}</a>
                                                 <span class="muted">${i.folder}</span>
-                                                <uui-tag color=${STATUS_COLORS[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
+                                                <uui-tag class="pill" color=${STATUS_COLORS[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
                                             </li>`
                                         )}
-                                    </ul>`}
+                                    </ul>
+                                    ${this._images.length < this._imageTotal
+                                        ? html`<div class="more">
+                                              <uui-button look="secondary" compact label="Show more images" @click=${() => this.#loadImages(person.id, true)}>Show more</uui-button>
+                                              <span class="muted">Showing ${this._images.length} of ${this._imageTotal}</span>
+                                          </div>`
+                                        : nothing}`}
                           </uui-box>
                       `
                     : nothing}
@@ -161,6 +181,8 @@ export class MediaGovernancePersonModalElement extends UmbModalBaseElement<Perso
         .images li a { font-weight: 600; color: var(--uui-color-interactive); text-decoration: none; }
         .images li a:hover { text-decoration: underline; }
         .images li uui-tag { margin-left: auto; }
+        .pill { width: 7rem; justify-content: center; text-align: center; }
+        .more { display: flex; align-items: center; gap: var(--uui-size-space-4); margin-top: var(--uui-size-space-4); }
         .erase { margin-right: auto; }
     `];
 }

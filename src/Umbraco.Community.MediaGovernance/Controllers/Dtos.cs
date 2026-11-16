@@ -9,6 +9,15 @@ public record PersonRequest(string Name, string? Email, string? Phone, Guid? Lin
 /// <summary>Sets whether a person has given consent.</summary>
 public record ConsentChangeRequest(bool Given);
 
+/// <summary>A person tagged on an image, with whether they have given consent.</summary>
+public record TaggedPersonDto(Guid PersonId, string Name, bool ConsentGiven);
+
+/// <summary>One page of people. <paramref name="Total"/> is how many match, so the screen can offer "load more".</summary>
+public record PeoplePage(IReadOnlyList<PersonDto> Items, int Total);
+
+/// <summary>One page of the images a person is tagged in.</summary>
+public record PersonImagesPage(IReadOnlyList<PersonImageDto> Items, int Total);
+
 /// <summary>An image a person is tagged in, for the person's page.</summary>
 public record PersonImageDto(Guid MediaKey, string Name, string Folder, GovernanceStatus Status);
 
@@ -24,6 +33,7 @@ public record ImageGovernanceDto(
     ExpirySource ExpirySource,
     GovernanceStatus Status,
     IReadOnlyList<GovernanceStatus> Issues,
+    IReadOnlyList<TaggedPersonDto> People,
     DateOnly? DateUploaded = null,
     DateOnly? ExifDateTaken = null);
 

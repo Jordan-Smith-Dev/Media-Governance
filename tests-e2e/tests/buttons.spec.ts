@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { login, openGovernance } from "./helpers";
+import { login, view } from "./helpers";
 
 /** Widths of every action button on the page, grouped by size (compact or full). */
 async function widths(page: Page) {
@@ -32,17 +32,17 @@ test.beforeEach(async ({ page }) => {
     await login(page);
 });
 
-test("Action buttons share widths on the image Governance tab", async ({ page }) => {
-    await openGovernance(page, "Campus aerial");
-    await page.locator('uui-button[label="Add consent"]').waitFor();
-    expectConsistent(await widths(page));
-});
-
-for (const tab of ["Overview", "People", "Settings"]) {
-    test(`Action buttons share widths on the dashboard ${tab} tab`, async ({ page }) => {
-        await page.goto("/umbraco/section/media/dashboard/media-governance");
-        await page.locator(`umb-media-governance-dashboard uui-tab[label="${tab}"]`).click();
+for (const tab of ["overview", "people", "settings"] as const) {
+    test(`Action buttons share widths on the ${tab} tab`, async ({ page }) => {
+        await page.goto(view(tab));
         await page.locator("uui-button.action").first().waitFor();
         expectConsistent(await widths(page));
     });
 }
+
+test("Action buttons share widths in the person modal", async ({ page }) => {
+    await page.goto(view("people"));
+    await page.getByRole("button", { name: "Tom Reyes" }).first().click();
+    await page.locator("umb-media-governance-person-modal uui-button.action").first().waitFor();
+    expectConsistent(await widths(page));
+});

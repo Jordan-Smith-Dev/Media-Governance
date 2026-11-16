@@ -145,6 +145,7 @@ public class ImageController(
             StatusCalculator.ExpirySourceOf(facts, options),
             StatusCalculator.Calculate(facts, options, today),
             StatusCalculator.Issues(facts, options, today),
+            taggedPeople.OrderBy(p => p.Name).Select(p => new TaggedPersonDto(p.Id, p.Name, p.ConsentGiven)).ToList(),
             uploaded,
             facts.DateTaken is null ? await photoDates.FindAsync(mediaKey) : null);
     }

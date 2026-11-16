@@ -20,12 +20,16 @@ namespace Umbraco.Community.MediaGovernance.Controllers;
 [Route($"umbraco/{Constants.ApiName}/api/v{{version:apiVersion}}")]
 public class PeopleController(PersonService people, IImageRepository images, IImageCatalog catalog, StatusLookupService statuses, MediaGateCache gateCache, IBackOfficeSecurityAccessor security, GovernanceAccessChecker access) : GovernanceControllerBase(security, access)
 {
+    /// <summary>One page of people, matching the search text if given. Newest pages are fetched with skip and take.</summary>
     [HttpGet("people")]
-    [ProducesResponseType(typeof(IReadOnlyList<PersonDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> List([FromQuery] string? q)
+    [ProducesResponseType(typeof(PeoplePage), StatusCodes.Status200OK)]
+    public async Task<IActionResult> List([FromQuery] string? q, [FromQuery] int skip = 0, [FromQuery] int take = 50)
     {
         var counts = await images.CountTagsByPersonAsync();
-        return Ok((await people.ListAsync(q)).Select(p => ToDto(p, counts.GetValueOrDefault(p.Id))).ToList());
+        var all = await people.ListAsync(q);
+        var page = all.Skip(Math.Max(0, skip)).Take(Math.Clamp(take, 1, 200))
+            .Select(p => ToDto(p, counts.GetValueOrDefault(p.Id))).ToList();
+        return Ok(new PeoplePage(page, all.Count));
     }
 
     [HttpPost("people")]
@@ -84,21 +88,23 @@ public class PeopleController(PersonService people, IImageRepository images, IIm
 
     /// <summary>The images this person is tagged in, with each one's current status.</summary>
     [HttpGet("people/{id:guid}/images")]
-    [ProducesResponseType(typeof(IReadOnlyList<PersonImageDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PersonImagesPage), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> TaggedImages(Guid id)
+    public async Task<IActionResult> TaggedImages(Guid id, [FromQuery] int skip = 0, [FromQuery] int take = 25)
     {
         if (await people.GetAsync(id) is null) return NotFound();
 
         var keys = await images.ListImageKeysForPersonAsync(id);
-        if (keys.Count == 0) return Ok(Array.Empty<PersonImageDto>());
+        if (keys.Count == 0) return Ok(new PersonImagesPage([], 0));
 
         var info = (await catalog.ListImagesAsync()).ToDictionary(i => i.Key);
-        var statusByKey = await statuses.GetStatusesAsync(keys);
-        return Ok(keys.Where(info.ContainsKey)
-            .Select(k => new PersonImageDto(k, info[k].Name, info[k].Folder, statusByKey.GetValueOrDefault(k)))
-            .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList());
+        var known = keys.Where(info.ContainsKey).OrderBy(k => info[k].Name, StringComparer.OrdinalIgnoreCase).ToList();
+        // Statuses are worked out only for the page being shown.
+        var pageKeys = known.Skip(Math.Max(0, skip)).Take(Math.Clamp(take, 1, 100)).ToList();
+        var statusByKey = pageKeys.Count == 0 ? new Dictionary<Guid, GovernanceStatus>() : (await statuses.GetStatusesAsync(pageKeys)).ToDictionary(k => k.Key, k => k.Value);
+        return Ok(new PersonImagesPage(
+            pageKeys.Select(k => new PersonImageDto(k, info[k].Name, info[k].Folder, statusByKey.GetValueOrDefault(k))).ToList(),
+            known.Count));
     }
 
     /// <summary>Permanently erases the person and their image tags.</summary>

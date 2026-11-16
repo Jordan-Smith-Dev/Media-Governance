@@ -63,6 +63,13 @@ export type Person = {
 
 export type PersonRequest = Omit<Person, "id" | "taggedInCount" | "consentGiven" | "consentUpdatedUtc">;
 
+/** One page of people. `total` is how many match, so the screen can offer "load more". */
+export type PeoplePage = { items: Person[]; total: number };
+export type PersonImagesPage = { items: PersonImage[]; total: number };
+
+/** A person tagged on an image, with whether they have given consent. */
+export type TaggedPerson = { personId: string; name: string; consentGiven: boolean };
+
 /** An image a person is tagged in. */
 export type PersonImage = { mediaKey: string; name: string; folder: string; status: GovernanceStatus };
 
@@ -80,6 +87,8 @@ export type ImageGovernance = {
     expirySource: ExpirySource;
     status: GovernanceStatus;
     issues: GovernanceStatus[];
+    /** The people tagged on this image, with their consent. */
+    people: TaggedPerson[];
     dateUploaded: string | null;
     /** Date found in the photo's camera data; only sent while Date taken is empty. */
     exifDateTaken?: string | null;
@@ -197,8 +206,8 @@ export class GovernanceApi {
         URL.revokeObjectURL(url);
     }
 
-    people(query = "") {
-        return this.#json<Person[]>("GET", `people?q=${encodeURIComponent(query)}`);
+    people(query = "", skip = 0, take = 50) {
+        return this.#json<PeoplePage>("GET", `people?q=${encodeURIComponent(query)}&skip=${skip}&take=${take}`);
     }
     createPerson(p: PersonRequest) {
         return this.#json<Person>("POST", "people", p);
@@ -223,8 +232,8 @@ export class GovernanceApi {
     setConsent(personId: string, given: boolean) {
         return this.#json<Person>("PUT", `people/${personId}/consent`, { given });
     }
-    personImages(personId: string) {
-        return this.#json<PersonImage[]>("GET", `people/${personId}/images`);
+    personImages(personId: string, skip = 0, take = 25) {
+        return this.#json<PersonImagesPage>("GET", `people/${personId}/images?skip=${skip}&take=${take}`);
     }
 
     pagesAffected() {

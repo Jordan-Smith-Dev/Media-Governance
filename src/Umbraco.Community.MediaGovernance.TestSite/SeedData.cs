@@ -33,6 +33,7 @@ public class SeedDataHandler(IServiceScopeFactory scopes, IWebHostEnvironment we
         new("Campus", "Campus aerial", D(2022, 9, 30), null, true, [], []),
         new("Events", "Open day crowd", D(2023, 11, 20), null, false, ["Amara Okafor", "Priya Shah"], ["Amara Okafor", "Priya Shah"]),
         new("Events", "Graduation 2023", D(2023, 7, 14), null, false, ["Verna Burke", "Jonas Weber"], ["Verna Burke", "Jonas Weber"]),
+        new("Events", "Group photo", D(2025, 3, 1), null, false, ["Verna Burke", "Amara Okafor", "Priya Shah", "Jonas Weber", "Bentley Milford"], ["Verna Burke"]),
         new("Events", "Sports day", D(2025, 6, 1), null, false, [], []),
         new("Events", "Welcome week", D(2025, 9, 15), null, true, [], []),
         new("Marketing", "Student ambassadors", D(2025, 9, 20), null, true, [], []),

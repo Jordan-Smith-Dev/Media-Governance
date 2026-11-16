@@ -12,7 +12,7 @@ public static class DigestBuilder
     public const int MaxPerGroup = 50;
 
     private const string ImagePath = "/umbraco/section/media/workspace/media/edit/";
-    private const string DashboardPath = "/umbraco/section/media";
+    private const string DashboardPath = "/umbraco/section/media/workspace/media-governance";
 
     private static readonly (GovernanceStatus Status, string Label)[] Order =
     [
@@ -48,10 +48,10 @@ public static class DigestBuilder
             }
             body.Append("</ul>");
             if (group.Count > MaxPerGroup)
-                body.Append($"<p>and {group.Count - MaxPerGroup} more. See the Media governance dashboard for the full list.</p>");
+                body.Append($"<p>and {group.Count - MaxPerGroup} more. See Governance for the full list.</p>");
         }
         if (siteUrl is not null)
-            body.Append($"<p><a href=\"{WebUtility.HtmlEncode(new Uri(siteUrl, DashboardPath).AbsoluteUri)}\">Open the Media governance dashboard</a></p>");
+            body.Append($"<p><a href=\"{WebUtility.HtmlEncode(new Uri(siteUrl, DashboardPath).AbsoluteUri)}\">Open Governance</a></p>");
         return body.ToString();
     }
 }

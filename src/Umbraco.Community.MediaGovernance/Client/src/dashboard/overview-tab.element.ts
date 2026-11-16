@@ -1,7 +1,7 @@
+import { MEDIA_GOVERNANCE_EXPIRY_MODAL } from "./expiry-modal.token.js";
 import { buttonStyles } from "../components/button-styles.js";
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
-import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
-import "../components/date-input.element.js";
+import { umbConfirmModal, umbOpenModal } from "@umbraco-cms/backoffice/modal";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
 import { STATUS_HELP, STATUS_LABELS, type GovernanceStatus, type OverviewSort, type OverviewItem, type OverviewPage, type Settings } from "../api/index.js";
 import { STATUS_COLORS, formatDate, relativeDays } from "./format.js";
@@ -31,7 +31,6 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
     @state() private _status: GovernanceStatus | null = null;
     @state() private _filter = "";
     @state() private _sort: OverviewSort = "Name";
-    @state() private _expiryDialog: { date: string } | null = null;
     @state() private _desc = false;
     @state() private _loading = true;
     @state() private _error = "";
@@ -136,11 +135,6 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         }
     }
 
-    override updated() {
-        const dialog = this.shadowRoot?.querySelector<HTMLDialogElement>("dialog[data-modal]");
-        if (dialog && !dialog.open) dialog.showModal();
-    }
-
     #plural(n: number) {
         return `${n} image${n === 1 ? "" : "s"}`;
     }
@@ -170,42 +164,22 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         }
     }
 
-    async #applyExpiry(clear: boolean) {
-        const dialog = this._expiryDialog;
-        if (!dialog) return;
-        if (!clear && !dialog.date) {
-            this.notify("danger", "Choose an expiry date.");
-            return;
-        }
+    /** One expiry date for every ticked image (or remove theirs), chosen in Umbraco's modal. */
+    async #setExpiry() {
+        let choice;
         try {
-            const change = clear ? { clearCustomExpiry: true } : { customExpiry: dialog.date };
-            const result = await this.api.bulkImages([...this._selected], change);
-            this._expiryDialog = null;
+            choice = await umbOpenModal(this, MEDIA_GOVERNANCE_EXPIRY_MODAL, { data: { count: this._selected.size } });
+        } catch {
+            return; // closed without choosing
+        }
+        if (!choice) return;
+        try {
+            const clear = choice.action === "clear";
+            const result = await this.api.bulkImages([...this._selected], choice.action === "clear" ? { clearCustomExpiry: true } : { customExpiry: choice.date });
             await this.#afterBulk(result, clear ? "Expiry date removed" : "Expiry date set");
         } catch (e) {
             this.notify("danger", errorMessage(e));
         }
-    }
-
-    #renderExpiryDialog() {
-        const d = this._expiryDialog;
-        if (!d) return nothing;
-        const close = () => (this._expiryDialog = null);
-        return html`
-            <dialog class="bulk" data-modal aria-labelledby="bulk-title" @close=${close}>
-                <div class="bulk-head"><strong id="bulk-title">Set expiry date for ${this.#plural(this._selected.size)}</strong></div>
-                <div class="bulk-body">
-                    <p class="muted">This replaces any custom expiry the images have now. Without one, an image expires after the retention period set in Settings.</p>
-                    <umb-media-governance-date-input label="Expiry date" .value=${d.date} @change=${(e: Event) => (this._expiryDialog = { date: (e as CustomEvent<string>).detail ?? "" })}></umb-media-governance-date-input>
-                </div>
-                <div class="bulk-foot">
-                    <uui-button class="action" look="secondary" label="Remove expiry" title="Go back to the default retention period" @click=${() => this.#applyExpiry(true)}>Remove expiry</uui-button>
-                    <span class="spacer"></span>
-                    <uui-button class="action" look="secondary" label="Cancel" @click=${close}>Cancel</uui-button>
-                    <uui-button class="action" look="primary" label="Set expiry" @click=${() => this.#applyExpiry(false)}>Set expiry</uui-button>
-                </div>
-            </dialog>
-        `;
     }
 
     #toggle(key: string, checked: boolean) {
@@ -257,7 +231,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                 ${this._selected.size > 0
                     ? html`<uui-button class="action" look="outline" label="Clear selection" @click=${() => (this._selected = new Set())}>Clear selection</uui-button>
                           <uui-button class="action" look="outline" label="Mark as no people" title="Mark the ticked images as having nobody pictured" @click=${this.#bulkNoPeople}><uui-icon name="icon-user"></uui-icon>No people</uui-button>
-                          <uui-button class="action" look="outline" label="Set expiry date" title="Set one expiry date on the ticked images" @click=${() => (this._expiryDialog = { date: "" })}><uui-icon name="icon-calendar"></uui-icon>Set expiry</uui-button>`
+                          <uui-button class="action" look="outline" label="Set expiry date" title="Set one expiry date on the ticked images" @click=${this.#setExpiry}><uui-icon name="icon-calendar"></uui-icon>Set expiry</uui-button>`
                     : nothing}
                 <uui-button class="action" look="primary" label=${this._selected.size > 0 ? "Export selected" : "Export all matching"}
                     title=${this._selected.size > 0 ? "Exports only the images you have ticked" : "Exports every image matching the current filter. Tick images to export only those."}
@@ -266,7 +240,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                 </uui-button>
             </div>
 
-            ${this.#renderExpiryDialog()}
+            
 
             ${filtering
                 ? html`
@@ -285,8 +259,8 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
     #renderPeople(item: OverviewItem) {
         if (item.people.length === 0)
             return item.noPeople
-                ? html`<span class="muted">No people</span>`
-                : html`<span class="untagged" title="Nobody is tagged and the image is not marked as having no people">Not tagged yet</span>`;
+                ? html`<uui-tag look="outline" title="Nobody is pictured, so no one needs to be tagged">No people</uui-tag>`
+                : html`<uui-tag look="outline" color="warning" title="Nobody is tagged and the image is not marked as having no people">Not tagged yet</uui-tag>`;
         const shown = item.people.slice(0, MAX_PEOPLE_SHOWN);
         const more = item.people.length - shown.length;
         return html`
@@ -298,10 +272,12 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
     }
 
     #renderConsent(item: OverviewItem) {
-        if (item.consent === "Given") return html`<uui-tag color="positive" look="primary">Given</uui-tag>`;
-        if (item.consent === "Not given") return html`<uui-tag color="danger" look="primary">Not given</uui-tag>`;
+        if (item.consent === "Given") return html`<uui-tag class="pill" color="positive" look="primary">Given</uui-tag>`;
+        if (item.consent === "Not given") return html`<uui-tag class="pill" color="danger" look="primary">Not given</uui-tag>`;
         // nobody is pictured, so there is nothing to consent to; or nobody has been tagged yet, so it is not known
-        return html`<span class="muted">${item.noPeople ? "Not required" : "Unknown"}</span>`;
+        return item.noPeople
+            ? html`<uui-tag class="pill" look="outline" title="Nobody is pictured, so there is nothing to consent to">Not required</uui-tag>`
+            : html`<uui-tag class="pill" look="outline" color="warning" title="Nobody has been tagged yet, so consent is not known">Unknown</uui-tag>`;
     }
 
     #renderTable() {
@@ -349,7 +325,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
                             <uui-table-cell>${this.#renderConsent(i)}</uui-table-cell>
                             <uui-table-cell>
                                 <div class="statuses">
-                                    <uui-tag color=${STATUS_COLORS[i.status]} title=${i.status === "Expired" && i.noPeople ? NO_PEOPLE_EXPIRED_HELP : STATUS_HELP[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
+                                    <uui-tag class="pill" color=${STATUS_COLORS[i.status]} title=${i.status === "Expired" && i.noPeople ? NO_PEOPLE_EXPIRED_HELP : STATUS_HELP[i.status]}>${STATUS_LABELS[i.status]}</uui-tag>
                                     ${i.issues.length > 1 ? html`<uui-tag look="secondary" title=${i.issues.filter((s) => s !== i.status).map((s) => `${STATUS_LABELS[s]}: ${STATUS_HELP[s]}`).join(NEWLINES)}>+${i.issues.length - 1}</uui-tag>` : nothing}
                                 </div>
                             </uui-table-cell>
@@ -399,13 +375,6 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         .images uui-table-head-cell { color: var(--uui-color-text-alt); font-weight: 600; }
         /* Keep the column headings in view while a long list scrolls; they need a solid background. */
         .images uui-table-head-cell { position: sticky; top: 0; z-index: 2; background: var(--uui-color-surface); }
-        dialog.bulk { width: min(600px, 92vw); padding: 0; border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); background: var(--uui-color-surface); color: var(--uui-color-text); box-shadow: var(--uui-shadow-depth-5); }
-        dialog.bulk::backdrop { background: rgba(0, 0, 0, 0.5); }
-        .bulk-head, .bulk-foot { display: flex; align-items: center; gap: var(--uui-size-space-4); padding: var(--uui-size-space-4) var(--uui-size-space-5); }
-        .bulk-head { border-bottom: 1px solid var(--uui-color-border); }
-        .bulk-foot { border-top: 1px solid var(--uui-color-border); }
-        .bulk-body { padding: var(--uui-size-space-4) var(--uui-size-space-5); display: flex; flex-direction: column; gap: var(--uui-size-space-4); }
-        .bulk-foot .spacer { flex: 1; }
         .sort { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: var(--uui-size-space-2); font-weight: 600; color: inherit; }
         .sort:hover, .sort.active { color: var(--uui-color-interactive-emphasis); }
         .sort:focus-visible { outline: 2px solid var(--uui-color-focus); outline-offset: 2px; border-radius: 2px; }
@@ -415,8 +384,9 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
         .images uui-table-cell { vertical-align: middle; }
         .name { color: var(--uui-color-interactive); font-weight: 600; text-decoration: none; }
         .name:hover { color: var(--uui-color-interactive-emphasis); text-decoration: underline; }
-        .untagged { color: var(--uui-color-warning-standalone); font-weight: 600; }
         uui-checkbox { margin-right: var(--uui-size-space-3); }
+        /* Consent and status pills are one width with the text centred, so the columns line up. */
+        .pill { width: var(--mg-pill-width, 7rem); justify-content: center; text-align: center; }
         .statuses { display: flex; gap: var(--uui-size-space-2); align-items: center; }
         .chips { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-2); }
         .sub { font-size: var(--uui-type-small-size); color: var(--uui-color-text-alt); margin-top: 2px; }

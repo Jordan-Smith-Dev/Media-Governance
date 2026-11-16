@@ -6,6 +6,10 @@ const PASSWORD = process.env.MG_PASSWORD ?? "1234567890";
 
 const API = "/umbraco/umbracocommunitymediagovernance/api/v1";
 
+/** The Governance page, opened from "Governance" in the Media sidebar. Each tab is a view under it. */
+export const GOVERNANCE = "/umbraco/section/media/workspace/media-governance";
+export const view = (name: "overview" | "people" | "pages" | "settings") => `${GOVERNANCE}/view/${name}`;
+
 // The backoffice's own bearer token, taken from its requests (it is short-lived, so keep the latest).
 const tokens = new WeakMap<Page, { value?: string }>();
 
@@ -44,11 +48,12 @@ export async function openGovernance(page: Page, image: string) {
 }
 
 /** Calls the package's own API with the backoffice's bearer token. */
-export async function api<T = unknown>(page: Page, method: "GET" | "PUT" | "POST", path: string, body?: unknown): Promise<T> {
+export async function api<T = unknown>(page: Page, method: "GET" | "PUT" | "POST" | "DELETE", path: string, body?: unknown): Promise<T> {
     const auth = tokens.get(page)?.value ?? "";
     const res = await page.request.fetch(`${API}/${path}`, { method, headers: { Authorization: auth }, data: body });
     expect(res.ok(), `${method} ${path} returned ${res.status()}`).toBeTruthy();
-    return (await res.json()) as T;
+    const text = await res.text();
+    return (text ? JSON.parse(text) : undefined) as T;
 }
 
 type ImageDetails = { dateTaken: string | null; dateObtained: string | null; customExpiry: string | null; noPeople: boolean; taggedPersonIds: string[] };
@@ -61,3 +66,13 @@ export async function snapshotImage(page: Page, mediaKey: string) {
 }
 
 export { mediaKeyFor };
+
+export type PersonSummary = { id: string; name: string; consentGiven: boolean };
+
+/** Finds a seeded person by name using the package's own people API. */
+export async function personFor(page: Page, name: string): Promise<PersonSummary> {
+    const body = await api<{ items: PersonSummary[] }>(page, "GET", "people?take=200");
+    const person = body.items.find((p) => p.name === name);
+    expect(person, `seeded person "${name}" not found`).toBeTruthy();
+    return person!;
+}

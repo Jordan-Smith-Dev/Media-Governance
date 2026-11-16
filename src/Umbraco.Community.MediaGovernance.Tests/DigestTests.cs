@@ -67,7 +67,7 @@ public class DigestBuilderTests
         var key = Guid.NewGuid();
         var html = DigestBuilder.Build([new Transition(key, GovernanceStatus.Expired)], new Dictionary<Guid, string> { [key] = "Aerial" }, new Uri("https://example.com/"));
         Assert.Contains($"<a href=\"https://example.com/umbraco/section/media/workspace/media/edit/{key}/invariant/view/governance\">Aerial</a>", html);
-        Assert.Contains("href=\"https://example.com/umbraco/section/media\"", html);
+        Assert.Contains("href=\"https://example.com/umbraco/section/media/workspace/media-governance\"", html);
     }
 
     [Fact]

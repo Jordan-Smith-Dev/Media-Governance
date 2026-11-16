@@ -23,6 +23,11 @@ export default defineConfig({
         ignoreHTTPSErrors: true,
         reuseExistingServer: true,
         timeout: 240_000,
-        env: { ASPNETCORE_ENVIRONMENT: "Development" },
+        // A database of its own, so the tests never touch the one used for day-to-day work. It is created and seeded on
+        // first start; change the file name here (for example e2e-3) to start again from the seed data.
+        env: {
+            ASPNETCORE_ENVIRONMENT: "Development",
+            ConnectionStrings__umbracoDbDSN: "Data Source=|DataDirectory|/Umbraco.e2e-2.sqlite.db;Cache=Shared;Foreign Keys=True;Pooling=True",
+        },
     },
 });

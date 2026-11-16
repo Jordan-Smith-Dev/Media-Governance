@@ -8,7 +8,7 @@ public class TreeIconColorTests
     [Theory]
     [InlineData(GovernanceStatus.Expired, "red")]
     [InlineData(GovernanceStatus.NoConsent, "red")]
-    [InlineData(GovernanceStatus.ExpiringSoon, "#b45309")]
+    [InlineData(GovernanceStatus.ExpiringSoon, "brown")]
     [InlineData(GovernanceStatus.Compliant, "green")]
     public void Each_status_has_a_colour(GovernanceStatus status, string color) =>
         Assert.Equal(color, TreeIconColor.For(status));

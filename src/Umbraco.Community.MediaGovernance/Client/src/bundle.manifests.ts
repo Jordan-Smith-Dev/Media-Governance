@@ -1,18 +1,18 @@
+import { EXPIRY_MODAL_ALIAS } from "./dashboard/expiry-modal.token.js";
 import { PERSON_MODAL_ALIAS } from "./dashboard/person-modal.token.js";
 import { GOVERNANCE_ENTITY_TYPE, GOVERNANCE_WORKSPACE_ALIAS } from "./workspace/constants.js";
 const ID = "Umbraco.Community.MediaGovernance";
 
 const FLAG_PREFIX = `${ID}.`;
 const signs: Array<{ status: string; label: string; icon: string; color: string }> = [
-    // Colours are Umbraco colour names or a CSS colour. "danger" is not an Umbraco colour name, and the pale
-    // "yellow" is hard to read at sign size, so warnings use a darker amber.
+    // Colours are Umbraco colour names. "brown" is the palette's warm warning colour; "yellow" is too pale to read at sign size.
     { status: "Expired", label: "Expired", icon: "icon-block", color: "red" },
     { status: "NoConsent", label: "No consent", icon: "icon-alert", color: "red" },
-    { status: "NeedsTagging", label: "Needs tagging", icon: "icon-tag", color: "#b45309" },
-    { status: "ExpiringSoon", label: "Expiring soon", icon: "icon-time", color: "#b45309" },
+    { status: "NeedsTagging", label: "Needs tagging", icon: "icon-tag", color: "brown" },
+    { status: "ExpiringSoon", label: "Expiring soon", icon: "icon-time", color: "brown" },
     // shown on folders: something inside needs attention
     { status: "FolderWithheld", label: "Contains images that cannot be used", icon: "icon-alert", color: "red" },
-    { status: "FolderWarning", label: "Contains images that need attention", icon: "icon-info", color: "#b45309" },
+    { status: "FolderWarning", label: "Contains images that need attention", icon: "icon-info", color: "brown" },
 ];
 
 export const manifests: Array<UmbExtensionManifest> = [
@@ -43,6 +43,12 @@ export const manifests: Array<UmbExtensionManifest> = [
             conditions: [{ alias: "Umb.Condition.WorkspaceAlias", match: GOVERNANCE_WORKSPACE_ALIAS }],
         })
     ),
+    {
+        type: "modal",
+        alias: EXPIRY_MODAL_ALIAS,
+        name: "Governance Expiry Modal",
+        element: () => import("./dashboard/expiry-modal.element.js"),
+    },
     {
         type: "modal",
         alias: PERSON_MODAL_ALIAS,
