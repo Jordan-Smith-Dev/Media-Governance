@@ -1,7 +1,7 @@
 import { buttonStyles } from "../components/button-styles.js";
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
-import type { UserGroup } from "../api/index.js";
+import type { Settings, UserGroup } from "../api/index.js";
 import { formatDate } from "./format.js";
 
 const splitList = (text: string) =>
@@ -12,25 +12,21 @@ const splitList = (text: string) =>
 
 const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 const MAX_RECIPIENTS = 25;
-const MAX_USES = 12;
-const MAX_USE_LENGTH = 30;
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/**
+ * Everything starts in appsettings (section Umbraco:Community:MediaGovernance). Here the retention period, the warning
+ * window and the notification recipients can be changed; everything else is shown read-only.
+ */
 @customElement("umb-media-governance-settings")
 export class MediaGovernanceSettingsElement extends GovernanceElement {
+    @state() private _settings?: Settings;
     @state() private _years = "3";
     @state() private _days = "90";
-    @state() private _uses = "";
     @state() private _emails = "";
     @state() private _groups: UserGroup[] = [];
     @state() private _groupIds: string[] = [];
-    @state() private _blockFiles = true;
-    @state() private _hidePages = true;
-    @state() private _signs = true;
-    @state() private _colours = true;
-    @state() private _folderMarkers = true;
-    @state() private _loaded = false;
     @state() private _error = "";
     @state() private _saving = false;
     @state() private _baseline = "";
@@ -43,26 +39,20 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
     async #load() {
         try {
             const s = await this.api.settings();
+            this._settings = s;
             this._years = String(s.retentionYears);
             this._days = String(s.warningDays);
-            this._uses = s.permittedUses.join(", ");
             this._emails = s.notificationEmails.join("\n");
             this._groupIds = s.notificationUserGroupIds ?? [];
             this._groups = await this.api.userGroups().catch(() => []);
-            this._blockFiles = s.blockWithheldFiles ?? true;
-            this._hidePages = s.hideWithheldInPages ?? true;
-            this._signs = s.showStatusSigns ?? true;
-            this._colours = s.colourTreeIcons ?? true;
-            this._folderMarkers = s.showFolderMarkers ?? true;
             this._baseline = this.#snapshot();
-            this._loaded = true;
         } catch (e) {
             this._error = errorMessage(e);
         }
     }
 
     #snapshot() {
-        return JSON.stringify([this._years, this._days, splitList(this._uses), splitList(this._emails), [...this._groupIds].sort(), this._blockFiles, this._hidePages, this._signs, this._colours, this._folderMarkers]);
+        return JSON.stringify([this._years, this._days, splitList(this._emails), [...this._groupIds].sort()]);
     }
 
     get #dirty() {
@@ -79,25 +69,9 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         return !Number.isInteger(n) || n < 0 || n > 3650 ? "Enter a whole number of days from 0 to 3650." : "";
     }
 
-    get #usesError() {
-        const uses = this.#uniqueUses;
-        if (uses.length === 0) return "Add at least one permitted use, otherwise consent cannot be recorded.";
-        if (uses.length > MAX_USES) return `Use at most ${MAX_USES} permitted uses.`;
-        const tooLong = uses.find((u) => u.length > MAX_USE_LENGTH);
-        return tooLong ? `"${tooLong.slice(0, 20)}…" is too long: keep each use under ${MAX_USE_LENGTH} characters.` : "";
-    }
-
-    get #uniqueUses() {
-        return this.#unique(splitList(this._uses));
-    }
-
     get #uniqueEmails() {
-        return this.#unique(splitList(this._emails));
-    }
-
-    #unique(list: string[]) {
         const seen = new Set<string>();
-        return list.filter((v) => !seen.has(v.toLowerCase()) && seen.add(v.toLowerCase()));
+        return splitList(this._emails).filter((v) => !seen.has(v.toLowerCase()) && seen.add(v.toLowerCase()));
     }
 
     get #emailError() {
@@ -110,16 +84,13 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         return emails.length > MAX_RECIPIENTS ? `Use at most ${MAX_RECIPIENTS} recipients.` : "";
     }
 
-    get #duplicateEmails() {
-        return splitList(this._emails).length - this.#uniqueEmails.length;
-    }
-
     get #valid() {
-        return !this.#yearsError && !this.#daysError && !this.#usesError && !this.#emailError;
+        return !this.#yearsError && !this.#daysError && !this.#emailError;
     }
 
-    #toggleGroup(id: string, on: boolean) {
-        this._groupIds = on ? [...new Set([...this._groupIds, id])] : this._groupIds.filter((g) => g !== id);
+    /** True when the retention period differs from the saved one, so existing images are about to be re-judged. */
+    get #retentionChanged() {
+        return !!this._settings && !this.#yearsError && Number(this._years) !== this._settings.retentionYears;
     }
 
     async #save() {
@@ -129,14 +100,8 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
             await this.api.saveSettings({
                 retentionYears: Number(this._years),
                 warningDays: Number(this._days),
-                permittedUses: splitList(this._uses),
                 notificationEmails: splitList(this._emails),
                 notificationUserGroupIds: this._groupIds,
-                blockWithheldFiles: this._blockFiles,
-                hideWithheldInPages: this._hidePages,
-                showStatusSigns: this._signs,
-                colourTreeIcons: this._colours,
-                showFolderMarkers: this._folderMarkers,
             });
             await this.#load();
             this.notify("positive", "Settings saved");
@@ -145,6 +110,10 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         } finally {
             this._saving = false;
         }
+    }
+
+    #toggleGroup(id: string, on: boolean) {
+        this._groupIds = on ? [...new Set([...this._groupIds, id])] : this._groupIds.filter((g) => g !== id);
     }
 
     /** What the retention rules mean for an image taken today. */
@@ -163,94 +132,58 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         `;
     }
 
-    #number(field: "_years" | "_days", e: Event) {
-        this[field] = (e.target as HTMLInputElement).value;
-    }
-
     override render() {
         if (this._error) return html`<uui-tag color="danger">${this._error}</uui-tag>`;
-        if (!this._loaded) return html`<uui-loader></uui-loader>`;
+        const s = this._settings;
+        if (!s) return html`<uui-loader></uui-loader>`;
 
         return html`
             <div class="page">
                 <uui-box headline="Retention rules">
-                    <umb-property-layout label="Default retention" description="How long an image can be used, counted from the date taken (or obtained).">
+                    <umb-property-layout label="Retention period" description="How long an image can be used, counted from the date taken (or obtained, or uploaded).">
                         <div slot="editor" class="field">
                             <div class="with-unit">
-                                <uui-input label="Default retention in years" type="number" min="1" max="100" .value=${this._years} @input=${(e: Event) => this.#number("_years", e)}></uui-input>
+                                <uui-input label="Retention in years" type="number" min="1" max="100" .value=${this._years} @input=${(e: Event) => (this._years = (e.target as HTMLInputElement).value)}></uui-input>
                                 <span>years</span>
                             </div>
+                            <span class="muted">Starting value from appsettings: ${s.defaultRetentionYears} ${s.defaultRetentionYears === 1 ? "year" : "years"}.</span>
                             ${this.#yearsError ? html`<span class="error">${this.#yearsError}</span>` : nothing}
+                            ${this.#retentionChanged
+                                ? html`<div class="callout" role="alert">
+                                      <strong>This affects existing images, not just new ones.</strong>
+                                      Expiry dates are worked out from the retention period every time, so saving a new value changes the expiry of every image
+                                      that does not have its own expiry date, straight away. Shortening it can make images expire, and expired images are
+                                      withheld from your website.
+                                  </div>`
+                                : nothing}
                         </div>
                     </umb-property-layout>
                     <umb-property-layout label="Warning window" description="Flag images as Expiring soon this many days before they expire.">
                         <div slot="editor" class="field">
                             <div class="with-unit">
-                                <uui-input label="Warning window in days" type="number" min="0" max="3650" .value=${this._days} @input=${(e: Event) => this.#number("_days", e)}></uui-input>
+                                <uui-input label="Warning window in days" type="number" min="0" max="3650" .value=${this._days} @input=${(e: Event) => (this._days = (e.target as HTMLInputElement).value)}></uui-input>
                                 <span>days</span>
                             </div>
+                            <span class="muted">Starting value from appsettings: ${s.defaultWarningDays} days.</span>
                             ${this.#daysError ? html`<span class="error">${this.#daysError}</span>` : nothing}
                         </div>
                     </umb-property-layout>
                     ${this.#example()}
                 </uui-box>
 
-                <uui-box headline="Consent">
-                    <umb-property-layout label="Permitted uses" description="The uses an editor can tick when recording consent. Separate them with commas.">
-                        <div slot="editor" class="field">
-                            <uui-input label="Permitted uses" .value=${this._uses} @input=${(e: Event) => (this._uses = (e.target as HTMLInputElement).value)}></uui-input>
-                            <div class="chips">${this.#uniqueUses.map((u) => html`<uui-tag look="secondary">${u}</uui-tag>`)}</div>
-                            ${this.#usesError ? html`<span class="error">${this.#usesError}</span>` : nothing}
-                        </div>
-                    </umb-property-layout>
-                </uui-box>
-
-                <uui-box headline="Front end (your public website)">
-                    <umb-property-layout label="Hide withheld images in pages" description="Applies to markup wrapped in the <media-governance> tag helper. When on, an image that has Expired or has no consent is left out of the page. When off, it still shows (and is still written to the log, so you can find the page).">
-                        <div slot="editor" class="field">
-                            <uui-toggle label="Hide withheld images in pages" .checked=${this._hidePages} @change=${(e: Event) => (this._hidePages = (e.target as HTMLInputElement).checked)}>
-                                ${this._hidePages ? "Hidden" : "Still shown"}
-                            </uui-toggle>
-                        </div>
-                    </umb-property-layout>
-                    <umb-property-layout label="Block withheld image files" description="When on, anyone requesting the file of an Expired image, or an image of someone without consent, gets a 404, even if they have the address. Signed-in editors can still see it. When off, only pages are affected.">
-                        <div slot="editor" class="field">
-                            <uui-toggle label="Block withheld image files" .checked=${this._blockFiles} @change=${(e: Event) => (this._blockFiles = (e.target as HTMLInputElement).checked)}>
-                                ${this._blockFiles ? "Blocked" : "Still served"}
-                            </uui-toggle>
-                            ${!this._blockFiles ? html`<span class="warn">Withheld images can still be reached by their address, and may still appear in search engines.</span>` : nothing}
-                        </div>
-                    </umb-property-layout>
-                </uui-box>
-
-                <uui-box headline="Media tree">
-                    <umb-property-layout label="Status signs on images" description="Small indicators on images in the media tree and collection, one for each problem (expired, no consent, and so on).">
-                        <div slot="editor" class="field">
-                            <uui-toggle label="Status signs on images" .checked=${this._signs} @change=${(e: Event) => (this._signs = (e.target as HTMLInputElement).checked)}>${this._signs ? "Shown" : "Hidden"}</uui-toggle>
-                        </div>
-                    </umb-property-layout>
-                    <umb-property-layout label="Coloured image icons" description="Colours each image's icon in the media tree by its status.">
-                        <div slot="editor" class="field">
-                            <uui-toggle label="Coloured image icons" .checked=${this._colours} @change=${(e: Event) => (this._colours = (e.target as HTMLInputElement).checked)}>${this._colours ? "Coloured" : "Plain"}</uui-toggle>
-                        </div>
-                    </umb-property-layout>
-                    <umb-property-layout label="Folder markers" description="A red or amber marker on folders (in the collection view) that contain images that cannot be used or need attention.">
-                        <div slot="editor" class="field">
-                            <uui-toggle label="Folder markers" .checked=${this._folderMarkers} @change=${(e: Event) => (this._folderMarkers = (e.target as HTMLInputElement).checked)}>${this._folderMarkers ? "Shown" : "Hidden"}</uui-toggle>
-                        </div>
-                    </umb-property-layout>
-                </uui-box>
-
                 <uui-box headline="Notifications">
-                    <umb-property-layout label="Recipients" description="Email addresses that get a daily digest when images need attention. One per line. Leave empty to send nothing.">
+                    <umb-property-layout
+                        label="Email addresses"
+                        description="Who gets the daily email when images need attention. One address per line. Nobody is listed by default, so no email is sent until you add an address or tick a user group below.">
                         <div slot="editor" class="field">
-                            <uui-textarea label="Notification recipients" .value=${this._emails} @input=${(e: Event) => (this._emails = (e.target as HTMLTextAreaElement).value)}></uui-textarea>
+                            <uui-textarea label="Notification email addresses" .value=${this._emails} @input=${(e: Event) => (this._emails = (e.target as HTMLTextAreaElement).value)}></uui-textarea>
                             ${this.#emailError ? html`<span class="error">${this.#emailError}</span>` : nothing}
-                            ${!this.#emailError && this.#duplicateEmails > 0 ? html`<span class="muted">${this.#duplicateEmails} duplicate ${this.#duplicateEmails === 1 ? "address" : "addresses"} will be merged when you save.</span>` : nothing}
-                            ${!this.#emailError && this.#uniqueEmails.length > 0 ? html`<span class="muted">${this.#uniqueEmails.length} ${this.#uniqueEmails.length === 1 ? "recipient" : "recipients"}</span>` : nothing}
+                            ${!this.#emailError && this.#uniqueEmails.length > 0 ? html`<span class="muted">${this.#uniqueEmails.length} ${this.#uniqueEmails.length === 1 ? "address" : "addresses"}</span>` : nothing}
                         </div>
                     </umb-property-layout>
-                    <umb-property-layout label="User groups" description="Everyone in a ticked group also gets the digest, using the email on their user account. Disabled and locked-out users are skipped.">
+                    <umb-property-layout
+                        label="User groups"
+                        description="Everyone in a ticked group also gets the email, at the address on their user account. A group is enough on its own: you do not need to list any addresses above. Disabled and locked-out users are skipped, and nobody gets it twice.">
                         <div slot="editor" class="field groups">
                             ${this._groups.length === 0
                                 ? html`<span class="muted">No user groups found.</span>`
@@ -267,6 +200,20 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
                         Save settings
                     </uui-button>
                 </div>
+
+                <uui-box headline="Set in appsettings (read-only)">
+                    <p class="muted intro">
+                        These are set by your developers in <code>appsettings.json</code>, under <code>Umbraco:Community:MediaGovernance</code>, and cannot be changed here.
+                    </p>
+                    <dl>
+                        <dt>Hide withheld images in pages</dt>
+                        <dd>${s.hideWithheldInPages ? "On: images that have expired, or whose people have not given consent, are left out of pages (using the <media-governance> tag helper)." : "Off: withheld images still show in pages."}</dd>
+                        <dt>Block withheld image files</dt>
+                        <dd>${s.blockWithheldFiles ? "On: the file of a withheld image returns a 404 to the public. Signed-in editors can still see it." : "Off: withheld images can still be reached by their address."}</dd>
+                        <dt>Who can use Governance</dt>
+                        <dd>${s.allowedUserGroups.length === 0 ? "No user groups." : s.allowedUserGroups.map((g) => html`<uui-tag look="secondary">${g}</uui-tag> `)}</dd>
+                    </dl>
+                </uui-box>
             </div>
         `;
     }
@@ -280,16 +227,19 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         umb-property-layout:last-of-type { padding-bottom: 0; }
         .field { display: flex; flex-direction: column; gap: var(--uui-size-space-3); }
         .with-unit { display: flex; align-items: center; gap: var(--uui-size-space-3); }
-        .with-unit uui-input { width: 120px; }
         .with-unit span { color: var(--uui-color-text-alt); }
-        .chips { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-2); }
-        .warn { color: var(--uui-color-warning-standalone, #b45309); font-size: var(--uui-type-small-size); }
         .muted { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
+        .intro { margin-top: 0; }
         .error { color: var(--uui-color-danger-standalone); font-size: var(--uui-type-small-size); }
+        .callout { padding: var(--uui-size-space-4) var(--uui-size-space-5); background: var(--uui-color-surface-alt); border-left: 4px solid var(--uui-color-warning); border-radius: var(--uui-border-radius); max-width: 560px; }
         .example { margin-top: var(--uui-size-space-5); padding: var(--uui-size-space-4) var(--uui-size-space-5); background: var(--uui-color-surface-alt); border-left: 3px solid var(--uui-color-interactive); border-radius: var(--uui-border-radius); }
         uui-textarea { width: 100%; max-width: 520px; }
         uui-input { max-width: 520px; width: 100%; }
         .with-unit uui-input { width: 120px; }
+        .groups { gap: var(--uui-size-space-3); }
+        dl { margin: 0; display: grid; grid-template-columns: 240px 1fr; gap: var(--uui-size-space-3) var(--uui-size-space-5); }
+        dt { font-weight: 600; }
+        dd { margin: 0; }
         .actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--uui-size-space-5); }
         .unsaved { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
     `];

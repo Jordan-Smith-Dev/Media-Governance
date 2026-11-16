@@ -1,3 +1,4 @@
+import { GOVERNANCE_ENTITY_TYPE, GOVERNANCE_WORKSPACE_ALIAS } from "./workspace/constants.js";
 const ID = "Umbraco.Community.MediaGovernance";
 
 const FLAG_PREFIX = `${ID}.`;
@@ -15,25 +16,42 @@ const signs: Array<{ status: string; label: string; icon: string; color: string 
 
 export const manifests: Array<UmbExtensionManifest> = [
     {
-        type: "dashboard",
-        alias: `${ID}.Dashboard`,
-        name: "Media Governance Dashboard",
-        element: () => import("./dashboard/dashboard.element.js"),
-        weight: 100,
-        meta: { label: "Media governance", pathname: "media-governance" },
-        conditions: [{ alias: "Umb.Condition.SectionAlias", match: "Umb.Section.Media" }],
+        // The Governance page: one workspace (like the Log Viewer) whose views are the header tabs.
+        type: "workspace",
+        alias: GOVERNANCE_WORKSPACE_ALIAS,
+        name: "Governance Workspace",
+        element: () => import("./workspace/governance-workspace.element.js"),
+        api: () => import("./workspace/governance-workspace.context.js"),
+        meta: { entityType: GOVERNANCE_ENTITY_TYPE },
     },
+    ...(
+        [
+            { key: "Overview", label: "Overview", path: "overview", icon: "icon-chart", weight: 400, element: () => import("./dashboard/overview-tab.element.js") },
+            { key: "People", label: "People", path: "people", icon: "icon-users", weight: 300, element: () => import("./dashboard/people-tab.element.js") },
+            { key: "Pages", label: "Pages affected", path: "pages", icon: "icon-document", weight: 200, element: () => import("./dashboard/pages-tab.element.js") },
+            { key: "Settings", label: "Settings", path: "settings", icon: "icon-settings", weight: 100, element: () => import("./dashboard/settings-tab.element.js") },
+        ] as const
+    ).map(
+        (v): UmbExtensionManifest => ({
+            type: "workspaceView",
+            alias: `${ID}.WorkspaceView.${v.key}`,
+            name: `Governance ${v.label} View`,
+            element: v.element,
+            weight: v.weight,
+            meta: { label: v.label, pathname: v.path, icon: v.icon },
+            conditions: [{ alias: "Umb.Condition.WorkspaceAlias", match: GOVERNANCE_WORKSPACE_ALIAS }],
+        })
+    ),
     {
-        // A shortcut in the Media sidebar (above the tree) so the dashboard is one click away from any media item.
+        // "Governance" in the Media sidebar (above the tree). Opens the Governance page.
         type: "menuItem",
-        kind: "link",
         alias: `${ID}.MenuItem`,
-        name: "Media Governance Menu Item",
+        name: "Governance Menu Item",
         weight: 200,
         meta: {
-            label: "Media governance",
+            label: "Governance",
             icon: "icon-shield",
-            href: "/umbraco/section/media/dashboard/media-governance",
+            entityType: GOVERNANCE_ENTITY_TYPE,
             menus: ["Umb.Menu.Media"],
         },
         conditions: [{ alias: "Umb.Condition.SectionAlias", match: "Umb.Section.Media" }],

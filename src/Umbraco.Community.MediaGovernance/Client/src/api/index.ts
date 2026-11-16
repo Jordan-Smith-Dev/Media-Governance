@@ -14,10 +14,10 @@ export const STATUS_LABELS: Record<GovernanceStatus, string> = {
 
 /** Plain-language meaning of each status, shown as a tooltip wherever a status appears. */
 export const STATUS_HELP: Record<GovernanceStatus, string> = {
-    Compliant: "Everything needed is in place: nobody is pictured, or everyone pictured has current consent, and the image is within its retention period.",
-    ExpiringSoon: "Still usable, but the retention period or a consent runs out within the warning window set in Settings.",
-    Expired: "The retention period has ended, or consent has run out. Do not use this image.",
-    NoConsent: "People are tagged in the image, but at least one has no current consent on file.",
+    Compliant: "Everything needed is in place: nobody is pictured, or everyone pictured has given consent, and the image is within its retention period.",
+    ExpiringSoon: "Still usable, but the retention period runs out within the warning window.",
+    Expired: "The retention period has ended. Do not use this image.",
+    NoConsent: "People are tagged in the image, but at least one has not given consent.",
     NeedsTagging: "Nobody has been tagged yet. Tag the people pictured, or mark that the image contains no people.",
 };
 
@@ -56,34 +56,16 @@ export type Person = {
     linkedUserKey: string | null;
     jobTitle: string | null;
     taggedInCount: number;
+    /** Whether the person has given consent to appear in images. */
+    consentGiven: boolean;
+    consentUpdatedUtc: string | null;
 };
 
-export type PersonRequest = Omit<Person, "id" | "taggedInCount">;
+export type PersonRequest = Omit<Person, "id" | "taggedInCount" | "consentGiven" | "consentUpdatedUtc">;
 
-export type Consent = {
-    id: string;
-    personId: string;
-    givenOn: string;
-    givenBy: string;
-    permittedUses: string[];
-    expiresOn: string | null;
-    withdrawnOn: string | null;
-    hasEvidence: boolean;
-    notes: string | null;
-    evidenceType?: string | null;
-    evidenceSizeBytes?: number | null;
-};
+/** An image a person is tagged in. */
+export type PersonImage = { mediaKey: string; name: string; folder: string; status: GovernanceStatus };
 
-export type EvidenceEvent = { action: string; whenUtc: string; actor: string };
-
-export type ConsentRequest = {
-    personId: string;
-    givenOn: string;
-    givenBy: string;
-    permittedUses: string[];
-    expiresOn: string | null;
-    notes: string | null;
-};
 
 export type ImageGovernance = {
     mediaKey: string;
@@ -93,11 +75,11 @@ export type ImageGovernance = {
     noPeople: boolean;
     taggedPersonIds: string[];
     effectiveExpiry: string | null;
+    /** The expiry worked out from retention, ignoring any custom date. */
+    defaultExpiry: string | null;
     expirySource: ExpirySource;
     status: GovernanceStatus;
     issues: GovernanceStatus[];
-    clearedUses: string[];
-    consents: Consent[];
     dateUploaded: string | null;
     /** Date found in the photo's camera data; only sent while Date taken is empty. */
     exifDateTaken?: string | null;
@@ -122,23 +104,26 @@ export type AffectedPage = {
     images: AffectedImage[];
 };
 
+/** What the Settings screen shows. Only retention, the warning window and recipients can be changed here; the rest comes from appsettings. */
 export type Settings = {
     retentionYears: number;
     warningDays: number;
-    permittedUses: string[];
+    /** The appsettings values behind retention and the warning window. */
+    defaultRetentionYears: number;
+    defaultWarningDays: number;
     notificationEmails: string[];
-    /** Backoffice user groups whose members also get the digest. */
-    notificationUserGroupIds?: string[] | null;
-    /** Withheld images' files return 404 to the public. */
-    blockWithheldFiles?: boolean | null;
-    /** The <media-governance> tag helper leaves withheld images out of pages. */
-    hideWithheldInPages?: boolean | null;
-    /** Status signs on images in the media tree and collection. Default on. */
-    showStatusSigns?: boolean | null;
-    /** Image icons in the media tree are coloured by status. Default on. */
-    colourTreeIcons?: boolean | null;
-    /** Red or amber marker on folders that contain images needing attention. Default on. */
-    showFolderMarkers?: boolean | null;
+    notificationUserGroupIds: string[];
+    /** Read-only (appsettings). */
+    blockWithheldFiles: boolean;
+    hideWithheldInPages: boolean;
+    allowedUserGroups: string[];
+};
+
+export type SettingsUpdate = {
+    retentionYears: number;
+    warningDays: number;
+    notificationEmails: string[];
+    notificationUserGroupIds: string[];
 };
 
 export type UserGroup = { id: string; name: string };
@@ -234,26 +219,12 @@ export class GovernanceApi {
     bulkImages(mediaKeys: string[], change: BulkImageChange) {
         return this.#json<BulkImageResult>("POST", "images/bulk", { mediaKeys, noPeople: false, clearCustomExpiry: false, ...change });
     }
-    addConsent(mediaKey: string, r: ConsentRequest) {
-        return this.#json<Consent>("POST", `image/${mediaKey}/consent`, r);
+
+    setConsent(personId: string, given: boolean) {
+        return this.#json<Person>("PUT", `people/${personId}/consent`, { given });
     }
-    async withdrawConsent(consentId: string, on: string | null): Promise<void> {
-        await this.#request("POST", `consent/${consentId}/withdraw`, { body: { on } });
-    }
-    /** Fetches a consent's evidence with the backoffice credentials. Each call is audited as a view. */
-    async evidence(consentId: string): Promise<Blob> {
-        return (await this.#request("GET", `consent/${consentId}/evidence`, { parseAs: "blob" })) as Blob;
-    }
-    evidenceHistory(consentId: string) {
-        return this.#json<EvidenceEvent[]>("GET", `consent/${consentId}/evidence/history`);
-    }
-    async removeEvidence(consentId: string): Promise<void> {
-        await this.#request("DELETE", `consent/${consentId}/evidence`);
-    }
-    async uploadEvidence(consentId: string, file: File): Promise<void> {
-        const form = new FormData();
-        form.append("file", file);
-        await this.#request("POST", `consent/${consentId}/evidence`, { form });
+    personImages(personId: string) {
+        return this.#json<PersonImage[]>("GET", `people/${personId}/images`);
     }
 
     pagesAffected() {
@@ -266,7 +237,7 @@ export class GovernanceApi {
     userGroups() {
         return this.#json<UserGroup[]>("GET", "user-groups");
     }
-    saveSettings(s: Settings) {
+    saveSettings(s: SettingsUpdate) {
         return this.#json<Settings>("PUT", "settings", s);
     }
 }

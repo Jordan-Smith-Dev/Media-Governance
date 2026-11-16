@@ -141,10 +141,11 @@ public class ImageController(
 
         return new ImageGovernanceDto(
             mediaKey, facts.DateTaken, facts.DateObtained, facts.CustomExpiry, facts.NoPeople, tagged,
-            StatusCalculator.EffectiveExpiry(facts, options), StatusCalculator.ExpirySourceOf(facts, options),
+            StatusCalculator.EffectiveExpiry(facts, options), StatusCalculator.EffectiveExpiry(facts with { CustomExpiry = null }, options),
+            StatusCalculator.ExpirySourceOf(facts, options),
             StatusCalculator.Calculate(facts, options, today),
             StatusCalculator.Issues(facts, options, today),
-            taggedPeople.OrderBy(p => p.Name).Select(p => new TaggedPersonDto(p.Id, p.Name, p.ConsentGiven)).ToList(), uploaded,
+            uploaded,
             facts.DateTaken is null ? await photoDates.FindAsync(mediaKey) : null);
     }
 
