@@ -127,24 +127,15 @@ public class NotificationRecipientTests
     public void Group_ids_are_deduplicated_and_defaulted()
     {
         var id = Guid.NewGuid();
-        var cleaned = GovernanceOptionsValidator.Normalize(new(3, 90, ["Web"], [], NotificationUserGroupIds: [id, id]));
+        var cleaned = GovernanceOptionsValidator.Normalize(new(3, 90, [], [id, id]));
         Assert.Equal([id], cleaned.NotificationUserGroupIds);
-        Assert.Empty(GovernanceOptionsValidator.Normalize(GovernanceOptions.Default).NotificationUserGroupIds!);
+        Assert.Empty(GovernanceOptionsValidator.Normalize(new SettingsUpdate(3, 90, [])).NotificationUserGroupIds!);
     }
 
     [Fact]
     public void Rejects_too_many_groups()
     {
         var many = Enumerable.Range(0, GovernanceOptionsValidator.MaxUserGroups + 1).Select(_ => Guid.NewGuid()).ToList();
-        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(new(3, 90, ["Web"], [], NotificationUserGroupIds: many)));
-    }
-
-    [Fact]
-    public void Old_saved_settings_without_groups_still_load()
-    {
-        var o = System.Text.Json.JsonSerializer.Deserialize<GovernanceOptions>(
-            """{"RetentionYears":3,"WarningDays":90,"PermittedUses":["Web"],"NotificationEmails":["a@x.com"]}""")!;
-        Assert.Null(o.NotificationUserGroupIds);
-        GovernanceOptionsValidator.Validate(GovernanceOptionsValidator.Normalize(o));
+        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(new SettingsUpdate(3, 90, [], many)));
     }
 }

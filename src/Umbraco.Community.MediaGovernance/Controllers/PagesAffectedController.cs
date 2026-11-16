@@ -15,8 +15,8 @@ namespace Umbraco.Community.MediaGovernance.Controllers;
 [Authorize(Policy = AuthorizationPolicies.SectionAccessMedia)]
 [ApiExplorerSettings(GroupName = Constants.ApiName)]
 [Route($"umbraco/{Constants.ApiName}/api/v{{version:apiVersion}}")]
-public class PagesAffectedController(AffectedPagesService pages, IBackOfficeSecurityAccessor security)
-    : GovernanceControllerBase(security)
+public class PagesAffectedController(AffectedPagesService pages, IBackOfficeSecurityAccessor security, GovernanceAccessChecker access)
+    : GovernanceControllerBase(security, access)
 {
     /// <summary>Pages that use expired images or images without consent, from Umbraco's tracked references.</summary>
     [HttpGet("pages-affected")]

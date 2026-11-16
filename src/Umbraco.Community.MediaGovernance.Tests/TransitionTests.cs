@@ -72,24 +72,22 @@ public class TransitionDetectorTests
 
 public class GovernanceOptionsValidatorTests
 {
-    private static GovernanceOptions Options(params string[] emails) => new(3, 90, ["Web"], emails);
+    private static SettingsUpdate Update(params string[] emails) => new(3, 90, emails);
 
     [Fact]
-    public void Accepts_valid_options() => GovernanceOptionsValidator.Validate(Options("ops@example.com"));
+    public void Accepts_valid_settings() => GovernanceOptionsValidator.Validate(Update("ops@example.com"));
 
     [Theory]
     [InlineData("not-an-email")]
     [InlineData("a@b.com, c@d.com")]
     [InlineData("")]
     public void Rejects_invalid_email_addresses(string email) =>
-        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(Options("ops@example.com", email)));
+        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(Update("ops@example.com", email)));
 
     [Fact]
     public void Normalize_trims_and_removes_duplicates_ignoring_case()
     {
-        var cleaned = GovernanceOptionsValidator.Normalize(new(3, 90,
-            [" Web ", "web", "Print", ""], [" Ops@Example.com ", "ops@example.com", "", "  "]));
-        Assert.Equal(["Web", "Print"], cleaned.PermittedUses);
+        var cleaned = GovernanceOptionsValidator.Normalize(Update(" Ops@Example.com ", "ops@example.com", "", "  "));
         Assert.Equal(["Ops@Example.com"], cleaned.NotificationEmails);
     }
 
@@ -97,34 +95,14 @@ public class GovernanceOptionsValidatorTests
     public void Rejects_more_than_25_recipients()
     {
         var many = Enumerable.Range(1, 26).Select(i => $"user{i}@example.com").ToArray();
-        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(Options(many)));
+        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(Update(many)));
     }
 
     [Fact]
     public void Accepts_exactly_25_recipients()
     {
         var many = Enumerable.Range(1, 25).Select(i => $"user{i}@example.com").ToArray();
-        GovernanceOptionsValidator.Validate(Options(many));
-    }
-
-    [Fact]
-    public void Rejects_no_permitted_uses() =>
-        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(new(3, 90, [], [])));
-
-    [Fact]
-    public void Rejects_a_permitted_use_longer_than_30_characters() =>
-        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(new(3, 90, [new string('x', 31)], [])));
-
-    [Fact]
-    public void Rejects_more_than_12_permitted_uses() =>
-        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(
-            new(3, 90, Enumerable.Range(1, 13).Select(i => $"Use {i}").ToArray(), [])));
-
-    [Fact]
-    public void Rejects_a_permitted_use_containing_a_comma_or_line_break()
-    {
-        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(new(3, 90, ["Web,Print"], [])));
-        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(new(3, 90, ["Web\nPrint"], [])));
+        GovernanceOptionsValidator.Validate(Update(many));
     }
 
     [Theory]
@@ -133,5 +111,5 @@ public class GovernanceOptionsValidatorTests
     [InlineData(3, -1)]
     [InlineData(3, 3651)]
     public void Rejects_out_of_range_retention_or_warning(int years, int days) =>
-        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(new(years, days, ["Web"], [])));
+        Assert.Throws<ArgumentException>(() => GovernanceOptionsValidator.Validate(new SettingsUpdate(years, days, [])));
 }

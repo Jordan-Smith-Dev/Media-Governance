@@ -30,6 +30,7 @@ namespace Umbraco.Community.MediaGovernance.Composers
             s.AddScoped<INotifiedRepository, NotifiedRepository>();
             s.AddScoped<IMediaFileRepository, MediaFileRepository>();
 
+            s.AddSingleton<GovernanceAccessChecker>();
             s.AddScoped<IAuditService, AuditService>();
             s.AddScoped<ISettingsService, SettingsService>();
             s.AddScoped<ImageCatalog>();

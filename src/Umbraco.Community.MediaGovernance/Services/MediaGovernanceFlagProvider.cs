@@ -47,9 +47,9 @@ public class MediaGovernanceFlagProvider(IServiceScopeFactory scopes) : IFlagPro
         {
             using var cardScope = scopes.CreateScope();
             var cardOptions = await cardScope.ServiceProvider.GetRequiredService<ISettingsService>().GetAsync();
-            if (cardOptions.ShowFolderMarkers ?? true)
+            if (cardOptions.ShowFolderMarkers)
                 await MarkFoldersAsync(cardScope.ServiceProvider, cards);
-            if (cardOptions.ShowStatusSigns ?? true)
+            if (cardOptions.ShowStatusSigns)
                 await FlagImagesAsync(cardScope.ServiceProvider, cards.Select(c => (c.Id, c.MediaType.Id, (Action<string>)(f => c.AddFlag(f)), (Action<string>)(_ => { }))).ToList());
         }
 
@@ -58,8 +58,8 @@ public class MediaGovernanceFlagProvider(IServiceScopeFactory scopes) : IFlagPro
 
         using var scope = scopes.CreateScope();
         var options = await scope.ServiceProvider.GetRequiredService<ISettingsService>().GetAsync();
-        var signs = options.ShowStatusSigns ?? true;
-        var colours = options.ColourTreeIcons ?? true;
+        var signs = options.ShowStatusSigns;
+        var colours = options.ColourTreeIcons;
         if (!signs && !colours) return;
 
         await FlagImagesAsync(scope.ServiceProvider, items.Select(i => (i.Id, i.MediaType.Id,

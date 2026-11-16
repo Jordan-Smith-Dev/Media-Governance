@@ -33,7 +33,7 @@ public class ImageController(
     IGroupRecipients groupRecipients,
     IPhotoDates photoDates,
     IBackOfficeSecurityAccessor security,
-    Microsoft.Extensions.Options.IOptions<Umbraco.Community.MediaGovernance.Middleware.MediaGovernanceOptions> appSettings) : GovernanceControllerBase(security)
+    GovernanceAccessChecker access) : GovernanceControllerBase(security, access)
 {
     [HttpGet("image/{mediaKey:guid}")]
     [ProducesResponseType(typeof(ImageGovernanceDto), StatusCodes.Status200OK)]
@@ -86,25 +86,31 @@ public class ImageController(
     }
 
     [HttpGet("settings")]
-    [ProducesResponseType(typeof(GovernanceOptions), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetSettings() => Ok(WithEffectiveFrontEnd(await settings.GetAsync()));
+    [ProducesResponseType(typeof(SettingsDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSettings() => Ok(ToDto(await settings.GetAsync()));
 
     [HttpGet("user-groups")]
     [ProducesResponseType(typeof(IReadOnlyList<UserGroupInfo>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListUserGroups() => Ok(await groupRecipients.ListGroupsAsync());
 
+    /// <summary>Saves the settings the CMS can change: retention, warning window and recipients. Everything else is appsettings.</summary>
     [HttpPut("settings")]
-    [ProducesResponseType(typeof(GovernanceOptions), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(SettingsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> SaveSettings([FromBody] GovernanceOptions options)
+    public async Task<IActionResult> SaveSettings([FromBody] SettingsUpdate update)
     {
         try
         {
-            var saved = await settings.SaveAsync(options);
+            var before = await settings.GetAsync();
+            var saved = await settings.SaveAsync(update);
             gateCache.Clear();
-            await audit.WriteAsync(Actor, "settings.updated",
-                detail: $"retentionYears={saved.RetentionYears}, warningDays={saved.WarningDays}, recipients={saved.NotificationEmails.Count}, userGroups={saved.NotificationUserGroupIds?.Count ?? 0}, blockFiles={saved.BlockWithheldFiles?.ToString() ?? "default"}, hidePages={saved.HideWithheldInPages?.ToString() ?? "default"}, signs={saved.ShowStatusSigns ?? true}, treeColours={saved.ColourTreeIcons ?? true}, folderMarkers={saved.ShowFolderMarkers ?? true}");
-            return Ok(WithEffectiveFrontEnd(saved));
+            // Old and new values are recorded so a change can be traced. Recipients are counted, not listed: addresses are personal data.
+            await audit.WriteAsync(Actor, "settings.updated", detail:
+                $"retentionYears {before.RetentionYears} -> {saved.RetentionYears}; " +
+                $"warningDays {before.WarningDays} -> {saved.WarningDays}; " +
+                $"recipients {before.NotificationEmails.Count} -> {saved.NotificationEmails.Count}; " +
+                $"userGroups {before.NotificationUserGroupIds?.Count ?? 0} -> {saved.NotificationUserGroupIds?.Count ?? 0}");
+            return Ok(ToDto(saved));
         }
         catch (ArgumentException ex)
         {
@@ -112,12 +118,12 @@ public class ImageController(
         }
     }
 
-    /// <summary>Fills in the front-end choices still on their default, so the dashboard always shows what is really happening.</summary>
-    private GovernanceOptions WithEffectiveFrontEnd(GovernanceOptions saved)
-    {
-        var policy = FrontEndPolicy.Resolve(saved, appSettings.Value.BlockWithheldMediaFiles);
-        return saved with { BlockWithheldFiles = policy.BlockFiles, HideWithheldInPages = policy.HidePages };
-    }
+    private SettingsDto ToDto(GovernanceOptions o) => new(
+        o.RetentionYears, o.WarningDays,
+        settings.AppSettings.RetentionYears, settings.AppSettings.WarningDays,
+        o.NotificationEmails, o.NotificationUserGroupIds ?? [],
+        o.BlockWithheldFiles, o.HideWithheldInPages,
+        access.AllowedGroups);
 
     private async Task<ImageGovernanceDto> BuildAsync(Guid mediaKey)
     {

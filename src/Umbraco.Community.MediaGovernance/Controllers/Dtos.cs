@@ -40,3 +40,15 @@ public record ImageGovernanceRequest(
     DateOnly? CustomExpiry,
     bool NoPeople,
     IReadOnlyList<Guid> TaggedPersonIds);
+
+/// <summary>The settings screen: what is in force, the appsettings defaults behind retention and the warning window, and the read-only values.</summary>
+public record SettingsDto(
+    int RetentionYears,
+    int WarningDays,
+    int DefaultRetentionYears,
+    int DefaultWarningDays,
+    IReadOnlyList<string> NotificationEmails,
+    IReadOnlyList<Guid> NotificationUserGroupIds,
+    bool BlockWithheldFiles,
+    bool HideWithheldInPages,
+    IReadOnlyList<string> AllowedUserGroups);

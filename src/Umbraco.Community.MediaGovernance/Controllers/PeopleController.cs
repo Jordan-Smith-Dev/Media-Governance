@@ -18,7 +18,7 @@ namespace Umbraco.Community.MediaGovernance.Controllers;
 [Authorize(Policy = AuthorizationPolicies.SectionAccessMedia)]
 [ApiExplorerSettings(GroupName = Constants.ApiName)]
 [Route($"umbraco/{Constants.ApiName}/api/v{{version:apiVersion}}")]
-public class PeopleController(PersonService people, IImageRepository images, IImageCatalog catalog, StatusLookupService statuses, MediaGateCache gateCache, IBackOfficeSecurityAccessor security) : GovernanceControllerBase(security)
+public class PeopleController(PersonService people, IImageRepository images, IImageCatalog catalog, StatusLookupService statuses, MediaGateCache gateCache, IBackOfficeSecurityAccessor security, GovernanceAccessChecker access) : GovernanceControllerBase(security, access)
 {
     [HttpGet("people")]
     [ProducesResponseType(typeof(IReadOnlyList<PersonDto>), StatusCodes.Status200OK)]

@@ -1,40 +1,70 @@
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Services;
+using Umbraco.Community.MediaGovernance.Middleware;
 
 namespace Umbraco.Community.MediaGovernance.Services;
 
 public interface ISettingsService
 {
+    /// <summary>What is in force now: appsettings, with CMS overrides applied.</summary>
     Task<GovernanceOptions> GetAsync();
-    /// <summary>Cleans, validates and stores the options; returns what was stored.</summary>
-    Task<GovernanceOptions> SaveAsync(GovernanceOptions options);
+
+    /// <summary>The values from appsettings, before any CMS override.</summary>
+    MediaGovernanceOptions AppSettings { get; }
+
+    /// <summary>Cleans, validates and stores the CMS-editable settings; returns what is now in force.</summary>
+    Task<GovernanceOptions> SaveAsync(SettingsUpdate update);
 }
 
-public class SettingsService(IKeyValueService keyValues) : ISettingsService
+public class SettingsService(IKeyValueService keyValues, IOptions<MediaGovernanceOptions> app) : ISettingsService
 {
     private const string Key = "Umbraco.Community.MediaGovernance.Settings";
 
+    public MediaGovernanceOptions AppSettings => app.Value;
+
     public Task<GovernanceOptions> GetAsync()
     {
-        var json = keyValues.GetValue(Key);
-        if (string.IsNullOrWhiteSpace(json))
-            return Task.FromResult(GovernanceOptions.Default);
+        var stored = Read();
+        var a = app.Value;
+        return Task.FromResult(new GovernanceOptions(
+            stored?.RetentionYears ?? a.RetentionYears,
+            stored?.WarningDays ?? a.WarningDays,
+            stored?.NotificationEmails ?? [],
+            stored?.NotificationUserGroupIds,
+            a.BlockWithheldMediaFiles,
+            a.HideWithheldInPages,
+            a.ShowStatusSigns,
+            a.ColourTreeIcons,
+            a.ShowFolderMarkers));
+    }
 
+    public async Task<GovernanceOptions> SaveAsync(SettingsUpdate update)
+    {
+        var cleaned = GovernanceOptionsValidator.Normalize(update);
+        GovernanceOptionsValidator.Validate(cleaned);
+
+        var a = app.Value;
+        var stored = new StoredSettings(
+            cleaned.RetentionYears == a.RetentionYears ? null : cleaned.RetentionYears,
+            cleaned.WarningDays == a.WarningDays ? null : cleaned.WarningDays,
+            cleaned.NotificationEmails,
+            cleaned.NotificationUserGroupIds);
+        keyValues.SetValue(Key, JsonSerializer.Serialize(stored));
+        return await GetAsync();
+    }
+
+    private StoredSettings? Read()
+    {
+        var json = keyValues.GetValue(Key);
+        if (string.IsNullOrWhiteSpace(json)) return null;
         try
         {
-            return Task.FromResult(JsonSerializer.Deserialize<GovernanceOptions>(json) ?? GovernanceOptions.Default);
+            return JsonSerializer.Deserialize<StoredSettings>(json);
         }
         catch (JsonException)
         {
-            return Task.FromResult(GovernanceOptions.Default);
+            return null;
         }
-    }
-
-    public Task<GovernanceOptions> SaveAsync(GovernanceOptions options)
-    {
-        var cleaned = GovernanceOptionsValidator.Normalize(options);
-        GovernanceOptionsValidator.Validate(cleaned);
-        keyValues.SetValue(Key, JsonSerializer.Serialize(cleaned));
-        return Task.FromResult(cleaned);
     }
 }

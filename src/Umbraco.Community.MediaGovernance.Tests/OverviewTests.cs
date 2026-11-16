@@ -17,9 +17,14 @@ internal class FakeCatalog(params ImageInfo[] images) : IImageCatalog
 
 internal class FakeSettings : ISettingsService
 {
-    public GovernanceOptions Options { get; set; } = new(3, 90, ["Web", "Print", "Social", "Other"], []);
+    public GovernanceOptions Options { get; set; } = new(3, 90, []);
+    public Middleware.MediaGovernanceOptions AppSettings { get; set; } = new();
     public Task<GovernanceOptions> GetAsync() => Task.FromResult(Options);
-    public Task<GovernanceOptions> SaveAsync(GovernanceOptions options) { Options = options; return Task.FromResult(options); }
+    public Task<GovernanceOptions> SaveAsync(SettingsUpdate update)
+    {
+        Options = Options with { RetentionYears = update.RetentionYears, WarningDays = update.WarningDays, NotificationEmails = update.NotificationEmails, NotificationUserGroupIds = update.NotificationUserGroupIds };
+        return Task.FromResult(Options);
+    }
 }
 
 public class OverviewServiceTests

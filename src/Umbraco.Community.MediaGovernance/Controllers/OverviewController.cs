@@ -17,8 +17,8 @@ namespace Umbraco.Community.MediaGovernance.Controllers;
 [Authorize(Policy = AuthorizationPolicies.SectionAccessMedia)]
 [ApiExplorerSettings(GroupName = Constants.ApiName)]
 [Route($"umbraco/{Constants.ApiName}/api/v{{version:apiVersion}}")]
-public class OverviewController(OverviewService overview, IBackOfficeSecurityAccessor security)
-    : GovernanceControllerBase(security)
+public class OverviewController(OverviewService overview, IBackOfficeSecurityAccessor security, GovernanceAccessChecker access)
+    : GovernanceControllerBase(security, access)
 {
     [HttpGet("overview")]
     [ProducesResponseType(typeof(OverviewPage), StatusCodes.Status200OK)]

@@ -16,23 +16,36 @@ public record BulkImageChange(bool NoPeople, DateOnly? CustomExpiry, bool ClearC
 
 public record BulkImageResult(IReadOnlyList<Guid> Updated, IReadOnlyList<Guid> Skipped);
 
+/// <summary>What is in force: appsettings, with the retention period, warning window and recipients replaced by anything saved in the CMS.</summary>
 public record GovernanceOptions(
     int RetentionYears,
     int WarningDays,
-    IReadOnlyList<string> PermittedUses,
     IReadOnlyList<string> NotificationEmails,
-    bool? BlockWithheldFiles = null,
-    bool? HideWithheldInPages = null,
     IReadOnlyList<Guid>? NotificationUserGroupIds = null,
-    bool? ShowStatusSigns = null,
-    bool? ColourTreeIcons = null,
-    bool? ShowFolderMarkers = null)
+    bool BlockWithheldFiles = true,
+    bool HideWithheldInPages = true,
+    bool ShowStatusSigns = true,
+    bool ColourTreeIcons = true,
+    bool ShowFolderMarkers = true)
 {
     public GovernanceSettings ToCore() => new(RetentionYears, WarningDays);
 
-    public static GovernanceOptions Default { get; } =
-        new(3, 90, ["Web", "Print", "Social", "Marketing", "Other"], []);
+    public static GovernanceOptions Default { get; } = new(3, 90, []);
 }
+
+/// <summary>The only settings the CMS can change.</summary>
+public record SettingsUpdate(
+    int RetentionYears,
+    int WarningDays,
+    IReadOnlyList<string> NotificationEmails,
+    IReadOnlyList<Guid>? NotificationUserGroupIds = null);
+
+/// <summary>What is stored: only values that differ from appsettings, so the rest keeps following appsettings.</summary>
+public record StoredSettings(
+    int? RetentionYears,
+    int? WarningDays,
+    IReadOnlyList<string>? NotificationEmails,
+    IReadOnlyList<Guid>? NotificationUserGroupIds);
 
 public record ImageInfo(Guid Key, string Name, string Folder);
 
