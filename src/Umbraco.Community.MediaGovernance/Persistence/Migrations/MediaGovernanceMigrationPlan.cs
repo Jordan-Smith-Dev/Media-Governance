@@ -12,7 +12,8 @@ public class MediaGovernanceMigrationPlan : PackageMigrationPlan
     protected override void DefinePlan() =>
         To<CreateTablesMigration>(new Guid("0b0f4b1e-7c1a-4f0e-9c35-3f6a2d0e8a11"))
             .To<CreateMediaFileTableMigration>(new Guid("6c2a1f84-3b7d-4e59-8a10-9d4f5b2e7c33"))
-            .To<AddJobTitleMigration>(new Guid("a41d7c2e-58b3-4f6a-9e12-3c8b0d5f7a64"));
+            .To<AddJobTitleMigration>(new Guid("a41d7c2e-58b3-4f6a-9e12-3c8b0d5f7a64"))
+            .To<SimplifyConsentMigration>(new Guid("d3e8a5b1-9c47-4a2f-b6d0-17f4c8e92a05"));
 }
 
 public class CreateTablesMigration : AsyncMigrationBase
@@ -24,7 +25,6 @@ public class CreateTablesMigration : AsyncMigrationBase
         CreateIfMissing<PersonRow>(TableNames.Person);
         CreateIfMissing<ImageRow>(TableNames.Image);
         CreateIfMissing<ImagePersonRow>(TableNames.ImagePerson);
-        CreateIfMissing<ConsentRow>(TableNames.Consent);
         CreateIfMissing<AuditRow>(TableNames.Audit);
         CreateIfMissing<NotifiedRow>(TableNames.Notified);
         return Task.CompletedTask;
@@ -66,6 +66,35 @@ public class AddJobTitleMigration : AsyncMigrationBase
                 : $"ALTER TABLE {TableNames.Person} ADD JobTitle NVARCHAR(100) NULL";
             Execute.Sql(sql).Do();
         }
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// Consent becomes a yes/no on the person. Adds the two columns and drops the old per-image consent table
+/// (nothing was in use yet, so existing consent rows are not carried over).
+/// </summary>
+public class SimplifyConsentMigration : AsyncMigrationBase
+{
+    public SimplifyConsentMigration(IMigrationContext context) : base(context) { }
+
+    protected override Task MigrateAsync()
+    {
+        var isSqlite = DatabaseType.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+
+        if (!ColumnExists(TableNames.Person, "ConsentGiven"))
+            Execute.Sql(isSqlite
+                ? $"ALTER TABLE {TableNames.Person} ADD COLUMN ConsentGiven INTEGER NOT NULL DEFAULT 0"
+                : $"ALTER TABLE {TableNames.Person} ADD ConsentGiven BIT NOT NULL DEFAULT 0").Do();
+
+        if (!ColumnExists(TableNames.Person, "ConsentUpdatedUtc"))
+            Execute.Sql(isSqlite
+                ? $"ALTER TABLE {TableNames.Person} ADD COLUMN ConsentUpdatedUtc TEXT NULL"
+                : $"ALTER TABLE {TableNames.Person} ADD ConsentUpdatedUtc DATETIME NULL").Do();
+
+        if (TableExists(TableNames.LegacyConsent))
+            Delete.Table(TableNames.LegacyConsent).Do();
+
         return Task.CompletedTask;
     }
 }

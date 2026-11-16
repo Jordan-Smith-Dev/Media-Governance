@@ -4,14 +4,6 @@ namespace Umbraco.Community.MediaGovernance.Services;
 
 public record PersonInput(string Name, string? Email, string? Phone, Guid? LinkedMemberKey, Guid? LinkedUserKey, string? JobTitle = null);
 
-public record ConsentInput(
-    Guid PersonId,
-    DateOnly GivenOn,
-    string GivenBy,
-    IReadOnlyList<string> PermittedUses,
-    DateOnly? ExpiresOn,
-    string? Notes);
-
 public record ImageGovernanceUpdate(
     DateOnly? DateTaken,
     DateOnly? DateObtained,

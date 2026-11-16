@@ -2,34 +2,18 @@ using Umbraco.Community.MediaGovernance.Core.Models;
 
 namespace Umbraco.Community.MediaGovernance.Controllers;
 
-public record PersonDto(Guid Id, string Name, string? Email, string? Phone, Guid? LinkedMemberKey, Guid? LinkedUserKey, string? JobTitle, int TaggedInCount);
+public record PersonDto(Guid Id, string Name, string? Email, string? Phone, Guid? LinkedMemberKey, Guid? LinkedUserKey, string? JobTitle, int TaggedInCount, bool ConsentGiven = false, DateTime? ConsentUpdatedUtc = null);
 
 public record PersonRequest(string Name, string? Email, string? Phone, Guid? LinkedMemberKey, Guid? LinkedUserKey, string? JobTitle = null);
 
-public record ConsentDto(
-    Guid Id,
-    Guid PersonId,
-    DateOnly GivenOn,
-    string GivenBy,
-    IReadOnlyList<string> PermittedUses,
-    DateOnly? ExpiresOn,
-    DateOnly? WithdrawnOn,
-    bool HasEvidence,
-    string? Notes,
-    string? EvidenceType = null,
-    long? EvidenceSizeBytes = null);
+/// <summary>Sets whether a person has given consent.</summary>
+public record ConsentChangeRequest(bool Given);
 
-public record EvidenceEventDto(string Action, DateTime WhenUtc, string Actor);
+/// <summary>A person tagged on an image, with whether they have given consent.</summary>
+public record TaggedPersonDto(Guid PersonId, string Name, bool ConsentGiven);
 
-public record ConsentRequest(
-    Guid PersonId,
-    DateOnly GivenOn,
-    string GivenBy,
-    IReadOnlyList<string> PermittedUses,
-    DateOnly? ExpiresOn,
-    string? Notes);
-
-public record WithdrawRequest(DateOnly? On);
+/// <summary>An image a person is tagged in, for the person's page.</summary>
+public record PersonImageDto(Guid MediaKey, string Name, string Folder, GovernanceStatus Status);
 
 public record ImageGovernanceDto(
     Guid MediaKey,
@@ -42,8 +26,7 @@ public record ImageGovernanceDto(
     ExpirySource ExpirySource,
     GovernanceStatus Status,
     IReadOnlyList<GovernanceStatus> Issues,
-    IReadOnlyList<string> ClearedUses,
-    IReadOnlyList<ConsentDto> Consents,
+    IReadOnlyList<TaggedPersonDto> People,
     DateOnly? DateUploaded = null,
     DateOnly? ExifDateTaken = null);
 

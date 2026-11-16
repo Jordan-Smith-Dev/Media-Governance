@@ -9,8 +9,10 @@ public interface IPersonRepository
     Task<IReadOnlyList<PersonRow>> ListAsync(string? query);
     Task SaveAsync(PersonRow person);
 
-    /// <summary>Deletes the person, their tags and consent records. Returns evidence paths that must be deleted from storage.</summary>
-    Task<IReadOnlyList<string>> EraseAsync(Guid personId);
+    Task<IReadOnlyList<PersonRow>> GetManyAsync(IReadOnlyCollection<Guid> ids);
+
+    /// <summary>Deletes the person and their image tags.</summary>
+    Task EraseAsync(Guid personId);
 }
 
 public interface IImageRepository
@@ -19,8 +21,11 @@ public interface IImageRepository
     Task<IReadOnlyList<Guid>> GetTaggedPersonIdsAsync(Guid mediaKey);
     Task SaveAsync(ImageRow image, IReadOnlyList<Guid> taggedPersonIds);
 
-    /// <summary>Deletes governance data for a media item. Returns evidence paths that must be deleted from storage.</summary>
-    Task<IReadOnlyList<string>> DeleteForMediaAsync(Guid mediaKey);
+    /// <summary>Deletes governance data for a media item.</summary>
+    Task DeleteForMediaAsync(Guid mediaKey);
+
+    /// <summary>Keys of the images a person is tagged in.</summary>
+    Task<IReadOnlyList<Guid>> ListImageKeysForPersonAsync(Guid personId);
 
     /// <summary>Facts for the given media keys (keys with no governance data yield empty facts).</summary>
     Task<IReadOnlyList<ImageGovernanceFacts>> GetFactsAsync(IReadOnlyCollection<Guid> mediaKeys);
@@ -44,20 +49,11 @@ public interface IMediaFileRepository
     Task DeleteAsync(Guid mediaKey);
 }
 
-public interface IConsentRepository
-{
-    Task<ConsentRow?> GetAsync(Guid id);
-    Task SaveAsync(ConsentRow consent);
-    Task<IReadOnlyList<ConsentRow>> ListForImageAsync(Guid mediaKey);
-}
-
 public interface IAuditRepository
 {
     Task WriteAsync(AuditRow row);
     Task<IReadOnlyList<AuditRow>> ListAsync(int take);
 
-    /// <summary>Newest first: entries for one person on one image, limited to the given actions.</summary>
-    Task<IReadOnlyList<AuditRow>> ListForAsync(Guid mediaKey, Guid personId, IReadOnlyCollection<string> actions, int take);
 }
 
 public interface INotifiedRepository

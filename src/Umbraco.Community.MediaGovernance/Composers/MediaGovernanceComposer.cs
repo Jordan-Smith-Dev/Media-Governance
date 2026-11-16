@@ -26,21 +26,15 @@ namespace Umbraco.Community.MediaGovernance.Composers
 
             s.AddScoped<IPersonRepository, PersonRepository>();
             s.AddScoped<IImageRepository, ImageRepository>();
-            s.AddScoped<IConsentRepository, ConsentRepository>();
             s.AddScoped<IAuditRepository, AuditRepository>();
             s.AddScoped<INotifiedRepository, NotifiedRepository>();
             s.AddScoped<IMediaFileRepository, MediaFileRepository>();
-
-            // Evidence lives under umbraco/Data (outside wwwroot) so it is never served statically.
-            s.AddSingleton<IEvidenceStore>(sp => new EvidenceStore(
-                sp.GetRequiredService<IHostingEnvironment>().MapPathContentRoot("~/umbraco/Data/MediaGovernance/evidence")));
 
             s.AddScoped<IAuditService, AuditService>();
             s.AddScoped<ISettingsService, SettingsService>();
             s.AddScoped<ImageCatalog>();
             s.AddScoped<IImageCatalog>(sp => sp.GetRequiredService<ImageCatalog>());
             s.AddScoped<PersonService>();
-            s.AddScoped<ConsentService>();
             s.AddScoped<ImageGovernanceService>();
             s.AddScoped<OverviewService>();
             s.AddScoped<IMediaUploadDates, EntityMediaUploadDates>();

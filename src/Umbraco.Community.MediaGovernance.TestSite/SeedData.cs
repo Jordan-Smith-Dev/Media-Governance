@@ -160,12 +160,15 @@ public class SeedDataHandler(IServiceScopeFactory scopes, IWebHostEnvironment we
 
         var media = sp.GetRequiredService<IMediaService>();
         var images = sp.GetRequiredService<ImageGovernanceService>();
-        var consents = sp.GetRequiredService<ConsentService>();
 
         var personIds = new Dictionary<string, Guid>();
         foreach (var name in PeopleNames)
             personIds[name] = (await people.CreateAsync(
                 new PersonInput(name, $"{name.Split(' ')[0].ToLowerInvariant()}@example.com", null, null, null), Actor)).Id;
+
+        // Consent belongs to the person: anyone listed as consented on any image has given it.
+        foreach (var name in Images.SelectMany(i => i.Consented).Distinct())
+            await people.SetConsentAsync(personIds[name], true, Actor);
 
         var folders = Images.Select(i => i.Folder).Distinct().ToDictionary(f => f, f =>
         {
@@ -183,10 +186,6 @@ public class SeedDataHandler(IServiceScopeFactory scopes, IWebHostEnvironment we
             var tagged = img.People.Select(p => personIds[p]).ToList();
             await sp.GetRequiredService<IMediaFileIndex>().RefreshAsync(item.Key);
             await images.SaveAsync(item.Key, new ImageGovernanceUpdate(img.Taken, null, img.Custom, img.NoPeople, tagged), Actor);
-
-            foreach (var name in img.Consented)
-                await consents.AddAsync(item.Key,
-                    new ConsentInput(personIds[name], D(2024, 1, 10), ConsentGivenBy.Self, ["Web", "Print"], null, null), Actor);
         }
     }
 }

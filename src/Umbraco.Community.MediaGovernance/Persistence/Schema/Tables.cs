@@ -8,7 +8,8 @@ public static class TableNames
     public const string Person = "mgPerson";
     public const string Image = "mgImage";
     public const string ImagePerson = "mgImagePerson";
-    public const string Consent = "mgConsent";
+    /// <summary>Retired: consent used to be stored per image and person. Kept only so the migration can drop it.</summary>
+    public const string LegacyConsent = "mgConsent";
     public const string Audit = "mgAudit";
     public const string Notified = "mgNotified";
     public const string MediaFile = "mgMediaFile";
@@ -28,6 +29,8 @@ public class PersonRow
     [Column("JobTitle")] [NullSetting(NullSetting = NullSettings.Null)] [Length(100)] public string? JobTitle { get; set; }
     [Column("LinkedMemberKey")] [NullSetting(NullSetting = NullSettings.Null)] public Guid? LinkedMemberKey { get; set; }
     [Column("LinkedUserKey")] [NullSetting(NullSetting = NullSettings.Null)] public Guid? LinkedUserKey { get; set; }
+    [Column("ConsentGiven")] public bool ConsentGiven { get; set; }
+    [Column("ConsentUpdatedUtc")] [NullSetting(NullSetting = NullSettings.Null)] public DateTime? ConsentUpdatedUtc { get; set; }
     [Column("CreatedUtc")] public DateTime CreatedUtc { get; set; }
 }
 
@@ -51,23 +54,6 @@ public class ImagePersonRow
     [Column("Id")] [PrimaryKeyColumn(AutoIncrement = true)] public int Id { get; set; }
     [Column("MediaKey")] [Index(IndexTypes.NonClustered, Name = "IX_mgImagePerson_MediaKey")] public Guid MediaKey { get; set; }
     [Column("PersonId")] [Index(IndexTypes.NonClustered, Name = "IX_mgImagePerson_PersonId")] public Guid PersonId { get; set; }
-}
-
-[TableName(TableNames.Consent)]
-[PrimaryKey("Id", AutoIncrement = false)]
-[ExplicitColumns]
-public class ConsentRow
-{
-    [Column("Id")] [PrimaryKeyColumn(AutoIncrement = false)] public Guid Id { get; set; }
-    [Column("MediaKey")] [Index(IndexTypes.NonClustered, Name = "IX_mgConsent_MediaKey")] public Guid MediaKey { get; set; }
-    [Column("PersonId")] [Index(IndexTypes.NonClustered, Name = "IX_mgConsent_PersonId")] public Guid PersonId { get; set; }
-    [Column("GivenOn")] public DateTime GivenOn { get; set; }
-    [Column("GivenBy")] [Length(255)] public string GivenBy { get; set; } = string.Empty;
-    [Column("PermittedUses")] [Length(500)] public string PermittedUses { get; set; } = string.Empty;
-    [Column("ExpiresOn")] [NullSetting(NullSetting = NullSettings.Null)] public DateTime? ExpiresOn { get; set; }
-    [Column("WithdrawnOn")] [NullSetting(NullSetting = NullSettings.Null)] public DateTime? WithdrawnOn { get; set; }
-    [Column("EvidencePath")] [NullSetting(NullSetting = NullSettings.Null)] [Length(500)] public string? EvidencePath { get; set; }
-    [Column("Notes")] [NullSetting(NullSetting = NullSettings.Null)] [SpecialDbType(SpecialDbTypes.NVARCHARMAX)] public string? Notes { get; set; }
 }
 
 [TableName(TableNames.Audit)]

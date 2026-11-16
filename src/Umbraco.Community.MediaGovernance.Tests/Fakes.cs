@@ -8,18 +8,19 @@ namespace Umbraco.Community.MediaGovernance.Tests;
 internal class FakePersonRepository : IPersonRepository
 {
     public Dictionary<Guid, PersonRow> People { get; } = new();
-    public List<string> EvidenceToReturnOnErase { get; } = new();
     public List<Guid> Erased { get; } = new();
 
     public Task<PersonRow?> GetAsync(Guid id) => Task.FromResult(People.GetValueOrDefault(id));
     public Task<IReadOnlyList<PersonRow>> ListAsync(string? query) =>
         Task.FromResult<IReadOnlyList<PersonRow>>(People.Values.ToList());
     public Task SaveAsync(PersonRow person) { People[person.Id] = person; return Task.CompletedTask; }
-    public Task<IReadOnlyList<string>> EraseAsync(Guid personId)
+    public Task<IReadOnlyList<PersonRow>> GetManyAsync(IReadOnlyCollection<Guid> ids) =>
+        Task.FromResult<IReadOnlyList<PersonRow>>(People.Values.Where(p => ids.Contains(p.Id)).ToList());
+    public Task EraseAsync(Guid personId)
     {
         Erased.Add(personId);
         People.Remove(personId);
-        return Task.FromResult<IReadOnlyList<string>>(EvidenceToReturnOnErase.ToList());
+        return Task.CompletedTask;
     }
 }
 
@@ -37,8 +38,9 @@ internal class FakeImageRepository : IImageRepository
         Tags[image.MediaKey] = taggedPersonIds.ToList();
         return Task.CompletedTask;
     }
-    public Task<IReadOnlyList<string>> DeleteForMediaAsync(Guid mediaKey) =>
-        Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+    public Task DeleteForMediaAsync(Guid mediaKey) => Task.CompletedTask;
+    public Task<IReadOnlyList<Guid>> ListImageKeysForPersonAsync(Guid personId) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Tags.Where(t => t.Value.Contains(personId)).Select(t => t.Key).ToList());
     public Task<IReadOnlyDictionary<Guid, int>> CountTagsByPersonAsync() =>
         Task.FromResult<IReadOnlyDictionary<Guid, int>>(Tags.Values.SelectMany(t => t).GroupBy(p => p).ToDictionary(g => g.Key, g => g.Count()));
 
@@ -50,56 +52,10 @@ internal class FakeImageRepository : IImageRepository
             mediaKeys.Select(k => Facts.GetValueOrDefault(k) ?? new ImageGovernanceFacts(k, null, null, null, false, [], [])).ToList());
 }
 
-internal class FakeConsentRepository : IConsentRepository
-{
-    public Dictionary<Guid, ConsentRow> Consents { get; } = new();
-    public Task<ConsentRow?> GetAsync(Guid id) => Task.FromResult(Consents.GetValueOrDefault(id));
-    public Task SaveAsync(ConsentRow consent) { Consents[consent.Id] = consent; return Task.CompletedTask; }
-    public Task<IReadOnlyList<ConsentRow>> ListForImageAsync(Guid mediaKey) =>
-        Task.FromResult<IReadOnlyList<ConsentRow>>(Consents.Values.Where(c => c.MediaKey == mediaKey).ToList());
-}
-
 internal class FakeAuditRepository : IAuditRepository
 {
     public List<AuditRow> Rows { get; } = new();
     public Task WriteAsync(AuditRow row) { Rows.Add(row); return Task.CompletedTask; }
     public Task<IReadOnlyList<AuditRow>> ListAsync(int take) => Task.FromResult<IReadOnlyList<AuditRow>>(Rows);
 
-    public Task<IReadOnlyList<AuditRow>> ListForAsync(Guid mediaKey, Guid personId, IReadOnlyCollection<string> actions, int take) =>
-        Task.FromResult<IReadOnlyList<AuditRow>>(Rows
-            .Where(r => r.MediaKey == mediaKey && r.PersonId == personId && actions.Contains(r.Action))
-            .Reverse().Take(take).ToList());
-}
-
-internal class FakeEvidenceStore : IEvidenceStore
-{
-    public List<string> Deleted { get; } = new();
-    public List<Guid> PersonFoldersDeleted { get; } = new();
-    public bool FailOnSave { get; set; }
-    public bool FailOnDelete { get; set; }
-    public string Extension { get; set; } = ".pdf";
-    public Dictionary<string, byte[]> Files { get; } = new();
-
-    public Task<string> SaveAsync(Guid personId, Guid consentId, string fileName, Stream data) =>
-        FailOnSave ? throw new ArgumentException("bad file") : Task.FromResult($"{personId}/{consentId}{Extension}");
-
-    public Task<Stream?> OpenReadAsync(string path) =>
-        Task.FromResult<Stream?>(Files.TryGetValue(path, out var bytes) ? new MemoryStream(bytes) : null);
-
-    public Task<long?> GetSizeAsync(string path) =>
-        Task.FromResult(Files.TryGetValue(path, out var bytes) ? (long?)bytes.Length : null);
-
-    public Task DeleteAsync(IEnumerable<string> paths)
-    {
-        if (FailOnDelete) throw new IOException("locked");
-        Deleted.AddRange(paths);
-        return Task.CompletedTask;
-    }
-
-    public Task DeleteForPersonAsync(Guid personId)
-    {
-        if (FailOnDelete) throw new IOException("locked");
-        PersonFoldersDeleted.Add(personId);
-        return Task.CompletedTask;
-    }
 }

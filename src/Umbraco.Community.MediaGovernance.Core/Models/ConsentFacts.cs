@@ -5,4 +5,8 @@ public record ConsentFacts(
     DateOnly GivenOn,
     DateOnly? ExpiresOn,
     DateOnly? WithdrawnOn,
-    IReadOnlyList<string>? PermittedUses = null);
+    IReadOnlyList<string>? PermittedUses = null)
+{
+    /// <summary>Stand-in "given on" date for a plain yes/no consent, which has no date of its own.</summary>
+    public static readonly DateOnly Always = new(2000, 1, 1);
+}

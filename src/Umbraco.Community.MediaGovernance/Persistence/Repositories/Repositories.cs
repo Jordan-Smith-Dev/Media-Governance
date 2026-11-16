@@ -32,16 +32,21 @@ public class PersonRepository(IScopeProvider scopeProvider) : IPersonRepository
         scope.Complete();
     }
 
-    public async Task<IReadOnlyList<string>> EraseAsync(Guid personId)
+    public async Task<IReadOnlyList<PersonRow>> GetManyAsync(IReadOnlyCollection<Guid> ids)
+    {
+        if (ids.Count == 0) return [];
+        using var scope = scopeProvider.CreateScope(autoComplete: true);
+        // Filtered in memory: people are few, and this avoids provider limits on parameter counts.
+        var wanted = ids.ToHashSet();
+        return scope.Database.Fetch<PersonRow>($"SELECT * FROM {TableNames.Person}").Where(p => wanted.Contains(p.Id)).ToList();
+    }
+
+    public async Task EraseAsync(Guid personId)
     {
         using var scope = scopeProvider.CreateScope();
-        var evidence = scope.Database.Fetch<string>(
-            $"SELECT EvidencePath FROM {TableNames.Consent} WHERE PersonId = @0 AND EvidencePath IS NOT NULL", personId);
-        scope.Database.Execute($"DELETE FROM {TableNames.Consent} WHERE PersonId = @0", personId);
         scope.Database.Execute($"DELETE FROM {TableNames.ImagePerson} WHERE PersonId = @0", personId);
         scope.Database.Execute($"DELETE FROM {TableNames.Person} WHERE Id = @0", personId);
         scope.Complete();
-        return evidence;
     }
 }
 
@@ -76,18 +81,20 @@ public class ImageRepository(IScopeProvider scopeProvider) : IImageRepository
         scope.Complete();
     }
 
-    public async Task<IReadOnlyList<string>> DeleteForMediaAsync(Guid mediaKey)
+    public async Task<IReadOnlyList<Guid>> ListImageKeysForPersonAsync(Guid personId)
+    {
+        using var scope = scopeProvider.CreateScope(autoComplete: true);
+        return scope.Database.Fetch<Guid>($"SELECT DISTINCT MediaKey FROM {TableNames.ImagePerson} WHERE PersonId = @0", personId);
+    }
+
+    public async Task DeleteForMediaAsync(Guid mediaKey)
     {
         using var scope = scopeProvider.CreateScope();
-        var evidence = scope.Database.Fetch<string>(
-            $"SELECT EvidencePath FROM {TableNames.Consent} WHERE MediaKey = @0 AND EvidencePath IS NOT NULL", mediaKey);
-        scope.Database.Execute($"DELETE FROM {TableNames.Consent} WHERE MediaKey = @0", mediaKey);
         scope.Database.Execute($"DELETE FROM {TableNames.ImagePerson} WHERE MediaKey = @0", mediaKey);
         scope.Database.Execute($"DELETE FROM {TableNames.Image} WHERE MediaKey = @0", mediaKey);
         scope.Database.Execute($"DELETE FROM {TableNames.Notified} WHERE MediaKey = @0", mediaKey);
         scope.Database.Execute($"DELETE FROM {TableNames.MediaFile} WHERE MediaKey = @0", mediaKey);
         scope.Complete();
-        return evidence;
     }
 
     public async Task<IReadOnlyDictionary<Guid, int>> CountTagsByPersonAsync()
@@ -110,13 +117,16 @@ public class ImageRepository(IScopeProvider scopeProvider) : IImageRepository
 
         List<ImageRow> imageRows;
         List<ImagePersonRow> tagRows;
-        List<ConsentRow> consentRows;
+        List<PersonRow> personRows;
         if (wanted.Count <= MaxKeysForTargetedQuery)
         {
             // A handful of images (a page on the public site): query just those keys.
             imageRows = scope.Database.Fetch<ImageRow>($"SELECT * FROM {TableNames.Image} WHERE MediaKey IN (@keys)", new { keys = wanted });
             tagRows = scope.Database.Fetch<ImagePersonRow>($"SELECT * FROM {TableNames.ImagePerson} WHERE MediaKey IN (@keys)", new { keys = wanted });
-            consentRows = scope.Database.Fetch<ConsentRow>($"SELECT * FROM {TableNames.Consent} WHERE MediaKey IN (@keys)", new { keys = wanted });
+            var taggedIds = tagRows.Select(t => t.PersonId).Distinct().ToList();
+            personRows = taggedIds.Count == 0
+                ? []
+                : scope.Database.Fetch<PersonRow>($"SELECT * FROM {TableNames.Person} WHERE Id IN (@ids)", new { ids = taggedIds });
         }
         else
         {
@@ -124,12 +134,12 @@ public class ImageRepository(IScopeProvider scopeProvider) : IImageRepository
             // which avoids provider limits on the number of query parameters.
             imageRows = scope.Database.Fetch<ImageRow>($"SELECT * FROM {TableNames.Image}");
             tagRows = scope.Database.Fetch<ImagePersonRow>($"SELECT * FROM {TableNames.ImagePerson}");
-            consentRows = scope.Database.Fetch<ConsentRow>($"SELECT * FROM {TableNames.Consent}");
+            personRows = scope.Database.Fetch<PersonRow>($"SELECT * FROM {TableNames.Person}");
         }
 
         var images = imageRows.ToDictionary(i => i.MediaKey);
         var tags = tagRows.ToLookup(t => t.MediaKey, t => t.PersonId);
-        var consents = consentRows.ToLookup(c => c.MediaKey);
+        var consentedPeople = personRows.Where(p => p.ConsentGiven).Select(p => p.Id).ToHashSet();
 
         return wanted.Select(key =>
         {
@@ -141,9 +151,8 @@ public class ImageRepository(IScopeProvider scopeProvider) : IImageRepository
                 Dates.FromDb(row?.CustomExpiry),
                 row?.NoPeople ?? false,
                 tags[key].ToList(),
-                consents[key].Select(c => new ConsentFacts(
-                    c.PersonId, Dates.FromDb(c.GivenOn), Dates.FromDb(c.ExpiresOn), Dates.FromDb(c.WithdrawnOn),
-                    c.PermittedUses.Split(',', StringSplitOptions.RemoveEmptyEntries))).ToList());
+                // Consent is a yes/no on the person: a "yes" counts as in force, with no dates or limits.
+                tags[key].Where(consentedPeople.Contains).Select(id => new ConsentFacts(id, ConsentFacts.Always, null, null)).ToList());
         }).ToList();
     }
 }
@@ -188,32 +197,6 @@ public class MediaFileRepository(IScopeProvider scopeProvider) : IMediaFileRepos
     }
 }
 
-public class ConsentRepository(IScopeProvider scopeProvider) : IConsentRepository
-{
-    public async Task<ConsentRow?> GetAsync(Guid id)
-    {
-        using var scope = scopeProvider.CreateScope(autoComplete: true);
-        return scope.Database.SingleOrDefault<ConsentRow>("WHERE Id = @0", id);
-    }
-
-    public async Task SaveAsync(ConsentRow consent)
-    {
-        using var scope = scopeProvider.CreateScope();
-        if (scope.Database.Exists<ConsentRow>(consent.Id))
-            scope.Database.Update(consent);
-        else
-            scope.Database.Insert(consent);
-        scope.Complete();
-    }
-
-    public async Task<IReadOnlyList<ConsentRow>> ListForImageAsync(Guid mediaKey)
-    {
-        using var scope = scopeProvider.CreateScope(autoComplete: true);
-        return scope.Database.Fetch<ConsentRow>(
-            $"SELECT * FROM {TableNames.Consent} WHERE MediaKey = @0 ORDER BY GivenOn DESC", mediaKey);
-    }
-}
-
 public class AuditRepository(IScopeProvider scopeProvider) : IAuditRepository
 {
     public async Task WriteAsync(AuditRow row)
@@ -230,15 +213,6 @@ public class AuditRepository(IScopeProvider scopeProvider) : IAuditRepository
         return rows.Take(take).ToList();
     }
 
-    public async Task<IReadOnlyList<AuditRow>> ListForAsync(Guid mediaKey, Guid personId, IReadOnlyCollection<string> actions, int take)
-    {
-        if (actions.Count == 0) return [];
-        using var scope = scopeProvider.CreateScope(autoComplete: true);
-        var rows = scope.Database.Fetch<AuditRow>(
-            $"SELECT * FROM {TableNames.Audit} WHERE MediaKey = @0 AND PersonId = @1 AND Action IN (@2) ORDER BY Id DESC",
-            mediaKey, personId, actions.ToArray());
-        return rows.Take(take).ToList();
-    }
 }
 
 public class NotifiedRepository(IScopeProvider scopeProvider) : INotifiedRepository

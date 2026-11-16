@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using Umbraco.Community.MediaGovernance.Persistence.Repositories;
 using Umbraco.Community.MediaGovernance.Persistence.Schema;
 
@@ -6,9 +5,7 @@ namespace Umbraco.Community.MediaGovernance.Services;
 
 public class PersonService(
     IPersonRepository people,
-    IEvidenceStore evidence,
-    IAuditService audit,
-    ILogger<PersonService>? logger = null)
+    IAuditService audit)
 {
     public Task<IReadOnlyList<PersonRow>> ListAsync(string? query) => people.ListAsync(query);
 
@@ -32,28 +29,27 @@ public class PersonService(
         return row;
     }
 
-    /// <summary>
-    /// Permanently removes the person, their image tags, consent records and evidence files.
-    /// The audit entry records only that an erasure happened. Linked members/users are never touched.
-    /// </summary>
+    /// <summary>Records whether the person has given consent to appear in images. Every change is audited with who made it.</summary>
+    public async Task<PersonRow> SetConsentAsync(Guid id, bool given, string actor)
+    {
+        var row = await people.GetAsync(id) ?? throw new KeyNotFoundException($"Person {id} not found.");
+        if (row.ConsentGiven == given) return row;
+
+        row.ConsentGiven = given;
+        row.ConsentUpdatedUtc = DateTime.UtcNow;
+        await people.SaveAsync(row);
+        await audit.WriteAsync(actor, given ? "consent.given" : "consent.withdrawn", personId: id);
+        return row;
+    }
+
+    /// <summary>Permanently removes the person and their image tags. The audit entry records only that an erasure happened.</summary>
     public async Task EraseAsync(Guid id, string actor)
     {
         if (await people.GetAsync(id) is null)
             throw new KeyNotFoundException($"Person {id} not found.");
 
-        var evidencePaths = await people.EraseAsync(id);
-        try
-        {
-            await evidence.DeleteAsync(evidencePaths);
-            await evidence.DeleteForPersonAsync(id);
-        }
-        catch (Exception ex)
-        {
-            // The records are already gone; a locked file must not hide that or skip the audit entry.
-            logger?.LogWarning(ex, "Evidence files for erased person {PersonId} could not be fully deleted.", id);
-        }
-
-        await audit.WriteAsync(actor, "person.erased", personId: id, detail: "Person and related consent records erased on request.");
+        await people.EraseAsync(id);
+        await audit.WriteAsync(actor, "person.erased", personId: id, detail: "Person and their image tags erased on request.");
     }
 
     private static void Apply(PersonRow row, PersonInput input)

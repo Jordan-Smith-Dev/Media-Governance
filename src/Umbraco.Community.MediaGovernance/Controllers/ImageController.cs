@@ -21,7 +21,7 @@ namespace Umbraco.Community.MediaGovernance.Controllers;
 [Route($"umbraco/{Constants.ApiName}/api/v{{version:apiVersion}}")]
 public class ImageController(
     ImageGovernanceService images,
-    ConsentService consents,
+    IPersonRepository personRepository,
     ISettingsService settings,
     IAuditService audit,
     IMediaFileIndex fileIndex,
@@ -35,8 +35,6 @@ public class ImageController(
     IBackOfficeSecurityAccessor security,
     Microsoft.Extensions.Options.IOptions<Umbraco.Community.MediaGovernance.Middleware.MediaGovernanceOptions> appSettings) : GovernanceControllerBase(security)
 {
-    private const long MaxUploadBytes = EvidenceStore.MaxBytes + 1024;
-
     [HttpGet("image/{mediaKey:guid}")]
     [ProducesResponseType(typeof(ImageGovernanceDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -87,130 +85,6 @@ public class ImageController(
         return Ok(new BulkImageDto(result.Updated.Count, result.Skipped.Count + (keys.Count - realImages.Count)));
     }
 
-    [HttpPost("image/{mediaKey:guid}/consent")]
-    [ProducesResponseType(typeof(ConsentDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> AddConsent(Guid mediaKey, [FromBody] ConsentRequest request)
-    {
-        if (!catalog.IsImage(mediaKey)) return NotFound();
-        try
-        {
-            var row = await consents.AddAsync(mediaKey,
-                new ConsentInput(request.PersonId, request.GivenOn, request.GivenBy, request.PermittedUses, request.ExpiresOn, request.Notes),
-                Actor);
-            gateCache.Clear();
-            return Ok(ToDto(row, null));
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
-        {
-            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
-        }
-    }
-
-    [HttpPost("consent/{consentId:guid}/withdraw")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Withdraw(Guid consentId, [FromBody] WithdrawRequest request)
-    {
-        try
-        {
-            await consents.WithdrawAsync(consentId, request.On ?? DateOnly.FromDateTime(time.GetLocalNow().DateTime), Actor);
-            gateCache.Clear();
-            return Ok();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-    }
-
-    [HttpGet("consent/{consentId:guid}/evidence")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetEvidence(Guid consentId)
-    {
-        try
-        {
-            var file = await consents.OpenEvidenceAsync(consentId, Actor);
-            if (file is null) return NotFound();
-
-            // Type comes from the stored extension only; nosniff stops browsers second-guessing it.
-            Response.Headers["X-Content-Type-Options"] = "nosniff";
-            Response.Headers["Cache-Control"] = "no-store";
-            return File(file.Content, file.ContentType, file.FileName);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-    }
-
-    [HttpGet("consent/{consentId:guid}/evidence/history")]
-    [ProducesResponseType(typeof(IReadOnlyList<EvidenceEventDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetEvidenceHistory(Guid consentId)
-    {
-        try
-        {
-            var events = await consents.EvidenceHistoryAsync(consentId);
-            var names = new Dictionary<string, string>();
-            foreach (var key in events.Select(e => e.ActorKey).Distinct())
-                names[key] = await ActorNameAsync(key);
-            return Ok(events.Select(e => new EvidenceEventDto(e.Action, DateTime.SpecifyKind(e.WhenUtc, DateTimeKind.Utc), names[e.ActorKey])).ToList());
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-    }
-
-    /// <summary>Backoffice user name for an audit actor key; "System" for automatic actions.</summary>
-    private async Task<string> ActorNameAsync(string actorKey)
-    {
-        if (!Guid.TryParse(actorKey, out var key)) return actorKey == Actors.System ? "System" : "Unknown";
-        return (await users.GetAsync(key))?.Name ?? "A removed user";
-    }
-
-    [HttpDelete("consent/{consentId:guid}/evidence")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> RemoveEvidence(Guid consentId)
-    {
-        try
-        {
-            await consents.RemoveEvidenceAsync(consentId, Actor);
-            return Ok();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-    }
-
-    [HttpPost("consent/{consentId:guid}/evidence")]
-    [RequestSizeLimit(MaxUploadBytes)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UploadEvidence(Guid consentId, IFormFile file)
-    {
-        try
-        {
-            await using var stream = file.OpenReadStream();
-            await consents.AttachEvidenceAsync(consentId, file.FileName, stream, Actor);
-            return Ok();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (ArgumentException ex)
-        {
-            return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
-        }
-    }
-
     [HttpGet("settings")]
     [ProducesResponseType(typeof(GovernanceOptions), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSettings() => Ok(WithEffectiveFrontEnd(await settings.GetAsync()));
@@ -248,31 +122,24 @@ public class ImageController(
     private async Task<ImageGovernanceDto> BuildAsync(Guid mediaKey)
     {
         var (image, tagged) = await images.GetAsync(mediaKey);
-        var consentRows = await consents.ListForImageAsync(mediaKey);
+        var taggedPeople = await personRepository.GetManyAsync(tagged);
         var governanceOptions = await settings.GetAsync();
         var options = governanceOptions.ToCore();
         var uploaded = (await uploads.GetAsync([mediaKey])).TryGetValue(mediaKey, out var u) ? u : (DateOnly?)null;
         var facts = new ImageGovernanceFacts(
             mediaKey, Dates.FromDb(image.DateTaken), Dates.FromDb(image.DateObtained), Dates.FromDb(image.CustomExpiry),
             image.NoPeople, tagged,
-            consentRows.Select(c => new ConsentFacts(c.PersonId, Dates.FromDb(c.GivenOn), Dates.FromDb(c.ExpiresOn), Dates.FromDb(c.WithdrawnOn),
-                c.PermittedUses.Split(',', StringSplitOptions.RemoveEmptyEntries))).ToList(),
+            taggedPeople.Where(p => p.ConsentGiven).Select(p => new ConsentFacts(p.Id, ConsentFacts.Always, null, null)).ToList(),
             uploaded);
         var today = DateOnly.FromDateTime(time.GetLocalNow().DateTime);
-        var info = await consents.EvidenceInfoAsync(consentRows);
 
         return new ImageGovernanceDto(
             mediaKey, facts.DateTaken, facts.DateObtained, facts.CustomExpiry, facts.NoPeople, tagged,
             StatusCalculator.EffectiveExpiry(facts, options), StatusCalculator.ExpirySourceOf(facts, options),
             StatusCalculator.Calculate(facts, options, today),
             StatusCalculator.Issues(facts, options, today),
-            StatusCalculator.ClearedUses(facts, governanceOptions.PermittedUses, today),
-            consentRows.Select(c => ToDto(c, info.GetValueOrDefault(c.Id))).ToList(), uploaded,
+            taggedPeople.OrderBy(p => p.Name).Select(p => new TaggedPersonDto(p.Id, p.Name, p.ConsentGiven)).ToList(), uploaded,
             facts.DateTaken is null ? await photoDates.FindAsync(mediaKey) : null);
     }
 
-    private static ConsentDto ToDto(ConsentRow c, EvidenceInfo? info) =>
-        new(c.Id, c.PersonId, Dates.FromDb(c.GivenOn), c.GivenBy,
-            c.PermittedUses.Split(',', StringSplitOptions.RemoveEmptyEntries), Dates.FromDb(c.ExpiresOn),
-            Dates.FromDb(c.WithdrawnOn), c.EvidencePath is not null, c.Notes, info?.Type, info?.SizeBytes);
 }
