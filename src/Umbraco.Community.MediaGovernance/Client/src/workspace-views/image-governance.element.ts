@@ -191,11 +191,13 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                     const given = p?.consentGiven ?? false;
                     return html`
                         <uui-tag class="person" color=${given ? "positive" : "danger"} look="primary" title=${given ? "Has given consent" : "Has not given consent"}>
-                            <a class="person-link" href=${personHref(id)}>${p?.name ?? "Unknown person"}</a>
-                            <span class="consent-label">${given ? "Consent given" : "No consent"}</span>
-                            <uui-button compact label="Remove ${p?.name ?? "person"}" @click=${() => this.#removePerson(id)}>
-                                <uui-icon name="icon-wrong"></uui-icon>
-                            </uui-button>
+                            <span class="person-row">
+                                <a class="person-link" href=${personHref(id)}>${p?.name ?? "Unknown person"}</a>
+                                <span class="consent-label">${given ? "Consent given" : "No consent"}</span>
+                                <uui-button class="remove" compact label="Remove ${p?.name ?? "person"}" @click=${() => this.#removePerson(id)}>
+                                    <uui-icon name="icon-wrong"></uui-icon>
+                                </uui-button>
+                            </span>
                         </uui-tag>
                     `;
                 })}
@@ -232,10 +234,16 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         .autosave-note { margin: 0; color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); text-align: right; }
         .save-state { margin-right: var(--uui-size-space-3); }
         uui-input { max-width: 420px; width: 100%; }
-        .person { --uui-tag-padding: 2px 6px; }
+        .person { --uui-tag-padding: 0 var(--uui-size-space-3); min-height: 36px; }
+        .person[color="positive"] { --on-tag: var(--uui-color-positive-contrast); }
+        .person[color="danger"] { --on-tag: var(--uui-color-danger-contrast); }
+        .person-row { display: inline-flex; align-items: center; gap: var(--uui-size-space-3); min-height: 36px; color: var(--on-tag); }
         .person-link { color: inherit; font-weight: 600; text-decoration: none; }
         .person-link:hover { text-decoration: underline; }
-        .consent-label { margin: 0 var(--uui-size-space-2); font-weight: 400; opacity: 0.9; }
+        .consent-label { font-weight: 400; }
+        /* The remove icon takes the tag's own contrast colour (white on green and red). */
+        .remove { --uui-button-contrast: var(--on-tag); --uui-button-contrast-hover: var(--on-tag); color: var(--on-tag); }
+        .remove uui-icon { color: var(--on-tag); }
     `;
 }
 

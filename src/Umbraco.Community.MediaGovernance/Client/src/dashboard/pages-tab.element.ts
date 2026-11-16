@@ -3,6 +3,9 @@ import { GovernanceElement, errorMessage } from "../api/governance-element.js";
 import { STATUS_HELP, STATUS_LABELS, type AffectedPage } from "../api/index.js";
 import { STATUS_COLORS } from "./format.js";
 
+/** Images shown per page before the rest collapse into a "+N" tag with a tooltip, like the overview. */
+const MAX_IMAGES_SHOWN = 3;
+
 @customElement("umb-media-governance-pages")
 export class MediaGovernancePagesElement extends GovernanceElement {
     @state() private _pages: AffectedPage[] = [];
@@ -65,7 +68,7 @@ export class MediaGovernancePagesElement extends GovernanceElement {
                                       </uui-table-cell>
                                       <uui-table-cell>
                                           <div class="images">
-                                              ${p.images.map(
+                                              ${p.images.slice(0, MAX_IMAGES_SHOWN).map(
                                                   (i) => html`
                                                       <a class="image" href="/umbraco/section/media/workspace/media/edit/${i.mediaKey}/invariant/view/governance">
                                                           <span>${i.name}</span>
@@ -73,6 +76,13 @@ export class MediaGovernancePagesElement extends GovernanceElement {
                                                       </a>
                                                   `
                                               )}
+                                              ${p.images.length > MAX_IMAGES_SHOWN
+                                                  ? html`<uui-tag
+                                                        look="placeholder"
+                                                        title=${p.images.slice(MAX_IMAGES_SHOWN).map((i) => `${i.name}: ${STATUS_LABELS[i.status]}`).join("\n")}>
+                                                        +${p.images.length - MAX_IMAGES_SHOWN}
+                                                    </uui-tag>`
+                                                  : nothing}
                                           </div>
                                       </uui-table-cell>
                                   </uui-table-row>
@@ -93,7 +103,7 @@ export class MediaGovernancePagesElement extends GovernanceElement {
     }
 
     static override styles = css`
-        :host { display: block; }
+        :host { display: block; padding: var(--uui-size-layout-1); }
         .intro { margin: 0 0 var(--uui-size-space-5); color: var(--uui-color-text-alt); }
         .muted { color: var(--uui-color-text-alt); }
         .pages uui-table-cell, .pages uui-table-head-cell { padding: var(--uui-size-space-4) var(--uui-size-space-5); vertical-align: middle; }

@@ -370,7 +370,7 @@ export class MediaGovernanceOverviewElement extends GovernanceElement {
     }
 
     static override styles = [buttonStyles, css`
-        :host { display: block; }
+        :host { display: block; padding: var(--uui-size-layout-1); }
         .muted { color: var(--uui-color-text-alt); }
 
         /* Filter tiles */

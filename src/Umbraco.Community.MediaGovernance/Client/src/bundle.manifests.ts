@@ -1,3 +1,4 @@
+import { PERSON_MODAL_ALIAS } from "./dashboard/person-modal.token.js";
 import { GOVERNANCE_ENTITY_TYPE, GOVERNANCE_WORKSPACE_ALIAS } from "./workspace/constants.js";
 const ID = "Umbraco.Community.MediaGovernance";
 
@@ -42,6 +43,12 @@ export const manifests: Array<UmbExtensionManifest> = [
             conditions: [{ alias: "Umb.Condition.WorkspaceAlias", match: GOVERNANCE_WORKSPACE_ALIAS }],
         })
     ),
+    {
+        type: "modal",
+        alias: PERSON_MODAL_ALIAS,
+        name: "Governance Person Modal",
+        element: () => import("./dashboard/person-modal.element.js"),
+    },
     {
         // "Governance" in the Media sidebar (above the tree). Opens the Governance page.
         type: "menuItem",

@@ -219,7 +219,7 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
     }
 
     static override styles = [buttonStyles, css`
-        :host { display: block; }
+        :host { display: block; padding: var(--uui-size-layout-1); }
         .page { display: flex; flex-direction: column; gap: var(--uui-size-layout-1); width: 100%; }
         uui-box { --uui-box-default-padding: var(--uui-size-space-6); }
         umb-property-layout { padding: var(--uui-size-space-4) 0; }
