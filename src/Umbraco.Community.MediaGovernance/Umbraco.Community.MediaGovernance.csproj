@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+    <NoWarn>$(NoWarn);CS1998</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>Umbraco.Community.MediaGovernance</Product>
+    <PackageId>Umbraco.Community.MediaGovernance</PackageId>
+    <Title>Media Governance</Title>
+    <Description>Governs images in the Umbraco media library: tag the people pictured, record per-image consent, and track expiry and compliance from a Media section dashboard.</Description>
+    <PackageTags>umbraco;umbraco-marketplace;media;consent;gdpr;governance;compliance</PackageTags>
+    <Authors>Jordan Smith</Authors>
+    <Copyright>$([System.DateTime]::UtcNow.ToString(`yyyy`)) © Jordan Smith</Copyright>
+    <PackageReadmeFile>README_nuget.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Version>0.1.0</Version>
+    <!-- Ship the Core assembly inside this package instead of as a separate NuGet dependency -->
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeCoreInPackage</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <Target Name="IncludeCoreInPackage">
+    <ItemGroup>
+      <BuildOutputInPackage Include="$(OutputPath)Umbraco.Community.MediaGovernance.Core.dll" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Umbraco.Cms.Web.Website" Version="[17.8.1, 18.0.0)" />
+    <PackageReference Include="Umbraco.Cms.Web.Common" Version="[17.8.1, 18.0.0)" />
+    <PackageReference Include="Umbraco.Cms.Api.Common" Version="[17.8.1, 18.0.0)" />
+    <PackageReference Include="Umbraco.Cms.Api.Management" Version="[17.8.1, 18.0.0)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Umbraco.Community.MediaGovernance.Core\Umbraco.Community.MediaGovernance.Core.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Don't include the client folder as part of the NuGet build -->
+    <Content Remove="Client\**" />
+    <None Include="Client\public\umbraco-package.json" Pack="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\docs\README_nuget.md" Condition="Exists('..\..\docs\README_nuget.md')">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+</Project>
