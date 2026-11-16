@@ -1,6 +1,7 @@
 import { buttonStyles } from "../components/button-styles.js";
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
+import type { UserGroup } from "../api/index.js";
 import { formatDate } from "./format.js";
 
 const splitList = (text: string) =>
@@ -22,8 +23,13 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
     @state() private _days = "90";
     @state() private _uses = "";
     @state() private _emails = "";
+    @state() private _groups: UserGroup[] = [];
+    @state() private _groupIds: string[] = [];
     @state() private _blockFiles = true;
     @state() private _hidePages = true;
+    @state() private _signs = true;
+    @state() private _colours = true;
+    @state() private _folderMarkers = true;
     @state() private _loaded = false;
     @state() private _error = "";
     @state() private _saving = false;
@@ -41,8 +47,13 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
             this._days = String(s.warningDays);
             this._uses = s.permittedUses.join(", ");
             this._emails = s.notificationEmails.join("\n");
+            this._groupIds = s.notificationUserGroupIds ?? [];
+            this._groups = await this.api.userGroups().catch(() => []);
             this._blockFiles = s.blockWithheldFiles ?? true;
             this._hidePages = s.hideWithheldInPages ?? true;
+            this._signs = s.showStatusSigns ?? true;
+            this._colours = s.colourTreeIcons ?? true;
+            this._folderMarkers = s.showFolderMarkers ?? true;
             this._baseline = this.#snapshot();
             this._loaded = true;
         } catch (e) {
@@ -51,7 +62,7 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
     }
 
     #snapshot() {
-        return JSON.stringify([this._years, this._days, splitList(this._uses), splitList(this._emails), this._blockFiles, this._hidePages]);
+        return JSON.stringify([this._years, this._days, splitList(this._uses), splitList(this._emails), [...this._groupIds].sort(), this._blockFiles, this._hidePages, this._signs, this._colours, this._folderMarkers]);
     }
 
     get #dirty() {
@@ -107,6 +118,10 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         return !this.#yearsError && !this.#daysError && !this.#usesError && !this.#emailError;
     }
 
+    #toggleGroup(id: string, on: boolean) {
+        this._groupIds = on ? [...new Set([...this._groupIds, id])] : this._groupIds.filter((g) => g !== id);
+    }
+
     async #save() {
         if (!this.#valid) return;
         this._saving = true;
@@ -116,8 +131,12 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
                 warningDays: Number(this._days),
                 permittedUses: splitList(this._uses),
                 notificationEmails: splitList(this._emails),
+                notificationUserGroupIds: this._groupIds,
                 blockWithheldFiles: this._blockFiles,
                 hideWithheldInPages: this._hidePages,
+                showStatusSigns: this._signs,
+                colourTreeIcons: this._colours,
+                showFolderMarkers: this._folderMarkers,
             });
             await this.#load();
             this.notify("positive", "Settings saved");
@@ -204,6 +223,24 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
                     </umb-property-layout>
                 </uui-box>
 
+                <uui-box headline="Media tree">
+                    <umb-property-layout label="Status signs on images" description="Small indicators on images in the media tree and collection, one for each problem (expired, no consent, and so on).">
+                        <div slot="editor" class="field">
+                            <uui-toggle label="Status signs on images" .checked=${this._signs} @change=${(e: Event) => (this._signs = (e.target as HTMLInputElement).checked)}>${this._signs ? "Shown" : "Hidden"}</uui-toggle>
+                        </div>
+                    </umb-property-layout>
+                    <umb-property-layout label="Coloured image icons" description="Colours each image's icon in the media tree by its status.">
+                        <div slot="editor" class="field">
+                            <uui-toggle label="Coloured image icons" .checked=${this._colours} @change=${(e: Event) => (this._colours = (e.target as HTMLInputElement).checked)}>${this._colours ? "Coloured" : "Plain"}</uui-toggle>
+                        </div>
+                    </umb-property-layout>
+                    <umb-property-layout label="Folder markers" description="A red or amber marker on folders (in the collection view) that contain images that cannot be used or need attention.">
+                        <div slot="editor" class="field">
+                            <uui-toggle label="Folder markers" .checked=${this._folderMarkers} @change=${(e: Event) => (this._folderMarkers = (e.target as HTMLInputElement).checked)}>${this._folderMarkers ? "Shown" : "Hidden"}</uui-toggle>
+                        </div>
+                    </umb-property-layout>
+                </uui-box>
+
                 <uui-box headline="Notifications">
                     <umb-property-layout label="Recipients" description="Email addresses that get a daily digest when images need attention. One per line. Leave empty to send nothing.">
                         <div slot="editor" class="field">
@@ -211,6 +248,15 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
                             ${this.#emailError ? html`<span class="error">${this.#emailError}</span>` : nothing}
                             ${!this.#emailError && this.#duplicateEmails > 0 ? html`<span class="muted">${this.#duplicateEmails} duplicate ${this.#duplicateEmails === 1 ? "address" : "addresses"} will be merged when you save.</span>` : nothing}
                             ${!this.#emailError && this.#uniqueEmails.length > 0 ? html`<span class="muted">${this.#uniqueEmails.length} ${this.#uniqueEmails.length === 1 ? "recipient" : "recipients"}</span>` : nothing}
+                        </div>
+                    </umb-property-layout>
+                    <umb-property-layout label="User groups" description="Everyone in a ticked group also gets the digest, using the email on their user account. Disabled and locked-out users are skipped.">
+                        <div slot="editor" class="field groups">
+                            ${this._groups.length === 0
+                                ? html`<span class="muted">No user groups found.</span>`
+                                : this._groups.map(
+                                      (g) => html`<uui-checkbox label=${g.name} .checked=${this._groupIds.includes(g.id)} @change=${(e: Event) => this.#toggleGroup(g.id, (e.target as HTMLInputElement).checked)}></uui-checkbox>`,
+                                  )}
                         </div>
                     </umb-property-layout>
                 </uui-box>

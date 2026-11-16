@@ -66,6 +66,8 @@ namespace Umbraco.Community.MediaGovernance.Composers
                 }));
             builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, MediaFileIndexStartupHandler>();
             builder.AddNotificationAsyncHandler<MediaSavedNotification, MediaFileIndexSavedHandler>();
+            s.AddScoped<IGroupRecipients, GroupRecipients>();
+            s.AddScoped<IPhotoDates, ExifPhotoDates>();
             s.AddScoped<NotificationService>();
             s.TryAddSingleton(TimeProvider.System);
 

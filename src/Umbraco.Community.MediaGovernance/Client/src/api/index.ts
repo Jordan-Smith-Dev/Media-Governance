@@ -99,6 +99,8 @@ export type ImageGovernance = {
     clearedUses: string[];
     consents: Consent[];
     dateUploaded: string | null;
+    /** Date found in the photo's camera data; only sent while Date taken is empty. */
+    exifDateTaken?: string | null;
 };
 
 export type ImageGovernanceRequest = Pick<
@@ -125,11 +127,21 @@ export type Settings = {
     warningDays: number;
     permittedUses: string[];
     notificationEmails: string[];
+    /** Backoffice user groups whose members also get the digest. */
+    notificationUserGroupIds?: string[] | null;
     /** Withheld images' files return 404 to the public. */
     blockWithheldFiles?: boolean | null;
     /** The <media-governance> tag helper leaves withheld images out of pages. */
     hideWithheldInPages?: boolean | null;
+    /** Status signs on images in the media tree and collection. Default on. */
+    showStatusSigns?: boolean | null;
+    /** Image icons in the media tree are coloured by status. Default on. */
+    colourTreeIcons?: boolean | null;
+    /** Red or amber marker on folders that contain images needing attention. Default on. */
+    showFolderMarkers?: boolean | null;
 };
+
+export type UserGroup = { id: string; name: string };
 
 export class ApiError extends Error {
     constructor(public status: number, message: string) {
@@ -250,6 +262,9 @@ export class GovernanceApi {
 
     settings() {
         return this.#json<Settings>("GET", "settings");
+    }
+    userGroups() {
+        return this.#json<UserGroup[]>("GET", "user-groups");
     }
     saveSettings(s: Settings) {
         return this.#json<Settings>("PUT", "settings", s);

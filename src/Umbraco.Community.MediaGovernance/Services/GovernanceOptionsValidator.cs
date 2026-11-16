@@ -5,6 +5,7 @@ namespace Umbraco.Community.MediaGovernance.Services;
 public static class GovernanceOptionsValidator
 {
     public const int MaxRecipients = 25;
+    public const int MaxUserGroups = 25;
     public const int MaxEmailLength = 254;
     public const int MaxPermittedUses = 12;
     public const int MaxUseLength = 30;
@@ -13,7 +14,8 @@ public static class GovernanceOptionsValidator
     public static GovernanceOptions Normalize(GovernanceOptions options) => options with
     {
         PermittedUses = Clean(options.PermittedUses),
-        NotificationEmails = Clean(options.NotificationEmails)
+        NotificationEmails = Clean(options.NotificationEmails),
+        NotificationUserGroupIds = (options.NotificationUserGroupIds ?? []).Distinct().ToList()
     };
 
     private static List<string> Clean(IEnumerable<string> values) =>
@@ -44,6 +46,8 @@ public static class GovernanceOptionsValidator
 
         if (options.NotificationEmails.Count > MaxRecipients)
             throw new ArgumentException($"Use at most {MaxRecipients} recipients.", nameof(options));
+        if ((options.NotificationUserGroupIds?.Count ?? 0) > MaxUserGroups)
+            throw new ArgumentException($"Choose at most {MaxUserGroups} user groups.", nameof(options));
         foreach (var email in options.NotificationEmails)
         {
             if (email.Length > MaxEmailLength || !MailAddress.TryCreate(email, out var parsed) || parsed.Address != email.Trim())

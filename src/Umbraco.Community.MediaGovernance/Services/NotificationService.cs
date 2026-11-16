@@ -11,21 +11,30 @@ namespace Umbraco.Community.MediaGovernance.Services;
 /// <summary>Sends one digest email per run listing images that need attention.</summary>
 public class NotificationService(
     ISettingsService settings,
+    IGroupRecipients groupRecipients,
     IEmailSender email,
     IOptions<GlobalSettings> global,
     IHostingEnvironment hosting,
     ILogger<NotificationService> logger)
 {
+    /// <summary>Typed-in addresses plus those from user groups, without repeats (ignoring case).</summary>
+    public static List<string> Merge(IEnumerable<string> typed, IEnumerable<string> fromGroups) =>
+        typed.Concat(fromGroups).Select(e => e.Trim()).Where(e => e.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
     public async Task<bool> SendAsync(IReadOnlyList<Transition> transitions, IReadOnlyDictionary<Guid, string> names, IReadOnlyDictionary<Guid, string>? fileNames = null)
     {
         var options = await settings.GetAsync();
-        if (transitions.Count == 0 || options.NotificationEmails.Count == 0 || !email.CanSendRequiredEmail())
+        if (transitions.Count == 0 || !email.CanSendRequiredEmail())
+            return false;
+
+        var recipients = Merge(options.NotificationEmails, await groupRecipients.EmailsAsync(options.NotificationUserGroupIds ?? []));
+        if (recipients.Count == 0)
             return false;
 
         var body = DigestBuilder.Build(transitions, names, hosting.ApplicationMainUrl, fileNames);
         var from = global.Value.Smtp?.From ?? "noreply@localhost";
         var sent = 0;
-        foreach (var to in options.NotificationEmails)
+        foreach (var to in recipients)
         {
             try
             {

@@ -30,7 +30,11 @@ public record GovernanceOptions(
     IReadOnlyList<string> PermittedUses,
     IReadOnlyList<string> NotificationEmails,
     bool? BlockWithheldFiles = null,
-    bool? HideWithheldInPages = null)
+    bool? HideWithheldInPages = null,
+    IReadOnlyList<Guid>? NotificationUserGroupIds = null,
+    bool? ShowStatusSigns = null,
+    bool? ColourTreeIcons = null,
+    bool? ShowFolderMarkers = null)
 {
     public GovernanceSettings ToCore() => new(RetentionYears, WarningDays);
 

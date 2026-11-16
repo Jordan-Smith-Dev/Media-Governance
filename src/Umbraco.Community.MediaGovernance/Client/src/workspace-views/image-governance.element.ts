@@ -419,6 +419,11 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                 <uui-box headline="Image details">
                     <umb-property-layout label="Date taken" description=${this.#dateTakenHint(d)}>
                         <umb-media-governance-date-input slot="editor" label="Date taken" .value=${d.dateTaken ?? ""} @change=${(e: Event) => this.#date("dateTaken", e)}></umb-media-governance-date-input>
+                        ${!d.dateTaken && d.exifDateTaken
+                            ? html`<uui-button slot="editor" look="secondary" compact label="Use the date from the photo" @click=${() => this.#patch({ dateTaken: d.exifDateTaken })}>
+                                  Use ${formatDate(d.exifDateTaken)} from the photo's camera data
+                              </uui-button>`
+                            : nothing}
                     </umb-property-layout>
                     <umb-property-layout label="Date obtained" description="Used when the date taken is not known.">
                         <umb-media-governance-date-input slot="editor" label="Date obtained" .value=${d.dateObtained ?? ""} @change=${(e: Event) => this.#date("dateObtained", e)}></umb-media-governance-date-input>

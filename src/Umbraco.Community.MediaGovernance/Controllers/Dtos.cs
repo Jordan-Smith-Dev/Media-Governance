@@ -44,7 +44,8 @@ public record ImageGovernanceDto(
     IReadOnlyList<GovernanceStatus> Issues,
     IReadOnlyList<string> ClearedUses,
     IReadOnlyList<ConsentDto> Consents,
-    DateOnly? DateUploaded = null);
+    DateOnly? DateUploaded = null,
+    DateOnly? ExifDateTaken = null);
 
 public record BulkImageRequest(IReadOnlyList<Guid> MediaKeys, bool NoPeople, DateOnly? CustomExpiry, bool ClearCustomExpiry);
 

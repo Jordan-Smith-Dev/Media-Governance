@@ -46,16 +46,25 @@ public class MediaGovernanceFlagProvider(IServiceScopeFactory scopes) : IFlagPro
         if (cards.Count > 0)
         {
             using var cardScope = scopes.CreateScope();
-            await MarkFoldersAsync(cardScope.ServiceProvider, cards);
-            await FlagImagesAsync(cardScope.ServiceProvider, cards.Select(c => (c.Id, c.MediaType.Id, (Action<string>)(f => c.AddFlag(f)), (Action<string>)(_ => { }))).ToList());
+            var cardOptions = await cardScope.ServiceProvider.GetRequiredService<ISettingsService>().GetAsync();
+            if (cardOptions.ShowFolderMarkers ?? true)
+                await MarkFoldersAsync(cardScope.ServiceProvider, cards);
+            if (cardOptions.ShowStatusSigns ?? true)
+                await FlagImagesAsync(cardScope.ServiceProvider, cards.Select(c => (c.Id, c.MediaType.Id, (Action<string>)(f => c.AddFlag(f)), (Action<string>)(_ => { }))).ToList());
         }
 
         var items = itemViewModels.OfType<MediaTreeItemResponseModel>().ToList();
         if (items.Count == 0) return;
 
         using var scope = scopes.CreateScope();
-        await FlagImagesAsync(scope.ServiceProvider, items.Select(i => (i.Id, i.MediaType.Id, (Action<string>)(f => i.AddFlag(f)),
-            (Action<string>)(color => i.MediaType.Icon = TreeIconColor.Apply(i.MediaType.Icon, color) ?? i.MediaType.Icon))).ToList());
+        var options = await scope.ServiceProvider.GetRequiredService<ISettingsService>().GetAsync();
+        var signs = options.ShowStatusSigns ?? true;
+        var colours = options.ColourTreeIcons ?? true;
+        if (!signs && !colours) return;
+
+        await FlagImagesAsync(scope.ServiceProvider, items.Select(i => (i.Id, i.MediaType.Id,
+            (Action<string>)(f => { if (signs) i.AddFlag(f); }),
+            (Action<string>)(color => { if (colours) i.MediaType.Icon = TreeIconColor.Apply(i.MediaType.Icon, color) ?? i.MediaType.Icon; }))).ToList());
     }
 
     /// <summary>Adds one flag per problem to each image, and colours its icon where the host shows one.</summary>

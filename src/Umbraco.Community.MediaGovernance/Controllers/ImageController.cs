@@ -30,6 +30,8 @@ public class ImageController(
     IMediaUploadDates uploads,
     TimeProvider time,
     Umbraco.Cms.Core.Services.IUserService users,
+    IGroupRecipients groupRecipients,
+    IPhotoDates photoDates,
     IBackOfficeSecurityAccessor security,
     Microsoft.Extensions.Options.IOptions<Umbraco.Community.MediaGovernance.Middleware.MediaGovernanceOptions> appSettings) : GovernanceControllerBase(security)
 {
@@ -213,6 +215,10 @@ public class ImageController(
     [ProducesResponseType(typeof(GovernanceOptions), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSettings() => Ok(WithEffectiveFrontEnd(await settings.GetAsync()));
 
+    [HttpGet("user-groups")]
+    [ProducesResponseType(typeof(IReadOnlyList<UserGroupInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListUserGroups() => Ok(await groupRecipients.ListGroupsAsync());
+
     [HttpPut("settings")]
     [ProducesResponseType(typeof(GovernanceOptions), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -223,7 +229,7 @@ public class ImageController(
             var saved = await settings.SaveAsync(options);
             gateCache.Clear();
             await audit.WriteAsync(Actor, "settings.updated",
-                detail: $"retentionYears={saved.RetentionYears}, warningDays={saved.WarningDays}, recipients={saved.NotificationEmails.Count}, blockFiles={saved.BlockWithheldFiles?.ToString() ?? "default"}, hidePages={saved.HideWithheldInPages?.ToString() ?? "default"}");
+                detail: $"retentionYears={saved.RetentionYears}, warningDays={saved.WarningDays}, recipients={saved.NotificationEmails.Count}, userGroups={saved.NotificationUserGroupIds?.Count ?? 0}, blockFiles={saved.BlockWithheldFiles?.ToString() ?? "default"}, hidePages={saved.HideWithheldInPages?.ToString() ?? "default"}, signs={saved.ShowStatusSigns ?? true}, treeColours={saved.ColourTreeIcons ?? true}, folderMarkers={saved.ShowFolderMarkers ?? true}");
             return Ok(WithEffectiveFrontEnd(saved));
         }
         catch (ArgumentException ex)
@@ -261,7 +267,8 @@ public class ImageController(
             StatusCalculator.Calculate(facts, options, today),
             StatusCalculator.Issues(facts, options, today),
             StatusCalculator.ClearedUses(facts, governanceOptions.PermittedUses, today),
-            consentRows.Select(c => ToDto(c, info.GetValueOrDefault(c.Id))).ToList(), uploaded);
+            consentRows.Select(c => ToDto(c, info.GetValueOrDefault(c.Id))).ToList(), uploaded,
+            facts.DateTaken is null ? await photoDates.FindAsync(mediaKey) : null);
     }
 
     private static ConsentDto ToDto(ConsentRow c, EvidenceInfo? info) =>
