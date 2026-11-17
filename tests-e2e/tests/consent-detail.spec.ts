@@ -264,11 +264,9 @@ test("Download their data gives a zip with everything held about the person", as
     }
 });
 
-test("Settings lists the consent options that are switched on, read-only", async ({ page }) => {
+test("Settings does not show the consent options: they are appsettings only", async ({ page }) => {
     await page.goto(view("settings"));
     const s = page.locator("umb-media-governance-settings");
-    await expect(s.getByText("Consent detail")).toBeVisible();
-    for (const t of ["Date given and who gave it", "Expiry", "Evidence upload", "Permitted uses (Web, Print, Social)"]) await expect(s.getByText(t)).toBeVisible();
-    await expect(s.getByText("Evidence is kept in")).toBeVisible();
-    await expect(s.locator("uui-toggle")).toHaveCount(0);   // nothing to switch here: it all comes from appsettings
+    await expect(s.locator('uui-input[label="Retention in years"]')).toBeVisible();
+    for (const hidden of ["Consent detail", "Evidence is kept in", "Evidence upload", "Date given and who gave it"]) await expect(s.getByText(hidden), hidden).toHaveCount(0);
 });

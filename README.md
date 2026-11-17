@@ -4,6 +4,38 @@ An Umbraco 17 package that records who is pictured in each image, whether they h
 
 The package's own documentation (features, status rules, front-end usage) is in [docs/README_nuget.md](docs/README_nuget.md), which is also the NuGet page. This file covers **setting up, configuring and developing** it.
 
+## What it looks like
+
+### By default: consent is a yes or no
+
+Out of the box, consent is a single tick on the person. Everything is in one **Governance** page in the Media section.
+
+**Overview.** Every image with its status, who is pictured, whether they have consented, and when it expires. Filter, sort, export, and act on many images at once.
+
+![The Governance overview: status tiles, and a table of every image with people, expiry, consent and status](docs/images/overview.png)
+
+**People.** Add people once, tick *Consent given*, and every image they are tagged in follows.
+
+![A person's panel: details, a Consent given tick, and the images they are tagged in](docs/images/default-person.png)
+
+**On an image.** Tag the people pictured. Each person shows green (consent given) or red (no consent), and the expiry is worked out from the retention period.
+
+![An image's Governance tab: dates, an Expiry with an Expired tag, and tagged people shown green or red](docs/images/default-image.png)
+
+**Settings.** Only what an editor can change: how long images are kept, the warning window, and who gets the daily email. Everything else is configured by developers in `appsettings.json`.
+
+![The Settings tab: retention, warning window and notification recipients](docs/images/settings.png)
+
+### With the optional consent detail switched on
+
+For clients who need to show more, four independent settings (all off by default, see *Optional consent detail* below) add the date and who gave consent, an expiry, the uses it covers, and a signed form kept privately.
+
+![A person's panel with consent detail on: given on, given by, expires on, permitted uses, and an uploaded evidence file](docs/images/detailed-person.png)
+
+An image then shows which uses everyone pictured has agreed to, and a consent that has run out is flagged and makes the image Expired.
+
+![An image with consent detail on: Cleared for tags, and a person whose consent has expired](docs/images/detailed-image.png)
+
 ## 1. Install
 
 Requirements: Umbraco 17.8.1 or later (below 18), .NET 10, and a database Umbraco supports (SQL Server, SQLite).
@@ -64,18 +96,18 @@ Everything starts in `appsettings.json`, under `Umbraco:Community:MediaGovernanc
 | `RetentionYears` | 3 | Years an image can be used, counted from date taken, then date obtained, then upload date | Can be **overridden** in Governance, Settings |
 | `WarningDays` | 90 | How far ahead an image shows as *Expiring soon* | Can be **overridden** in Governance, Settings |
 | Notification recipients | none | Email addresses and user groups that get the daily digest | **Edited** in Governance, Settings |
-| `HideWithheldInPages` | `true` | The `<media-governance>` tag helper leaves out images that are Expired or have no consent. `false`: they still show, and are still logged | Read-only |
-| `BlockWithheldMediaFiles` | `true` | Requests for the file of a withheld image return 404 to the public (signed-in editors can still see it). `false`: only pages are affected | Read-only |
+| `HideWithheldInPages` | `true` | The `<media-governance>` tag helper leaves out images that are Expired or have no consent. `false`: they still show, and are still logged | Not shown |
+| `BlockWithheldMediaFiles` | `true` | Requests for the file of a withheld image return 404 to the public (signed-in editors can still see it). `false`: only pages are affected | Not shown |
 | `ShowStatusSigns` | `false` | Status signs on images in the media tree and collection. Off, so the tree looks like a normal Umbraco one | Not shown |
 | `ColourTreeIcons` | `false` | Colours each image's icon in the tree by status | Not shown |
 | `ShowFolderMarkers` | `false` | A marker on folders that contain images needing attention | Not shown |
-| `AllowedUserGroups` | `sensitiveData` | Who can use Governance (section 2) | Read-only |
-| `ConsentDetails` | `false` | Record the date consent was given and who gave it (the person, a parent or guardian, a legal representative) | Read-only (see below) |
-| `ConsentExpiry` | `false` | Let a consent end on a date; after that the person's images are Expired | Read-only |
-| `ConsentEvidence` | `false` | Attach a signed form or email to a person's consent | Read-only |
-| `PermittedUses` | `[]` | The uses a consent can cover, for example `["Web", "Print", "Social"]`. Empty means consent is not recorded per use | Read-only |
-| `EvidenceFolder` | `governance-evidence` | Folder in Umbraco's media file system that holds evidence. Never served to the public | Read-only |
-| `EvidenceStoragePath` | none | Keep evidence in a folder on disk, outside the website, instead | Read-only |
+| `AllowedUserGroups` | `sensitiveData` | Who can use Governance (section 2) | Not shown |
+| `ConsentDetails` | `false` | Record the date consent was given and who gave it (the person, a parent or guardian, a legal representative) | Not shown (see below) |
+| `ConsentExpiry` | `false` | Let a consent end on a date; after that the person's images are Expired | Not shown |
+| `ConsentEvidence` | `false` | Attach a signed form or email to a person's consent | Not shown |
+| `PermittedUses` | `[]` | The uses a consent can cover, for example `["Web", "Print", "Social"]`. Empty means consent is not recorded per use | Not shown |
+| `EvidenceFolder` | `governance-evidence` | Folder in Umbraco's media file system that holds evidence. Never served to the public | Not shown |
+| `EvidenceStoragePath` | none | Keep evidence in a folder on disk, outside the website, instead | Not shown |
 
 An override saved in the CMS is stored only when it differs from `appsettings.json`, so a value left at its starting point keeps following the file.
 
@@ -167,6 +199,8 @@ The test site's Development settings write emails to a folder instead of sending
 To send through a real mail server instead, replace the `Smtp` block in `appsettings.Development.json` with your server details (host, port, username, password, `From`). Use a throw-away mailbox, and do not commit credentials.
 
 If no file appears: check that a recipient is saved, that `mgNotified` was emptied, that some image is Expired, No consent, Needs tagging or Expiring soon, and look for warnings in the site log.
+
+**Screenshots.** The pictures above are generated, so they can be refreshed after a UI change. Start two copies of the test site (one with the consent options on, one with them off), then run `npm run screenshots` in `tests-e2e`. The commands are at the top of `tests-e2e/screenshots.mjs`.
 
 **Pack for NuGet / the Umbraco Marketplace.** The backoffice files are built, not committed, so build them before packing:
 

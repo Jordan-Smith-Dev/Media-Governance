@@ -17,7 +17,7 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 
 /**
  * Everything starts in appsettings (section Umbraco:Community:MediaGovernance). Here the retention period, the warning
- * window and the notification recipients can be changed; everything else is shown read-only.
+ * window and the notification recipients can be changed here. Everything else is appsettings only, and is not shown to editors.
  */
 @customElement("umb-media-governance-settings")
 export class MediaGovernanceSettingsElement extends GovernanceElement {
@@ -200,26 +200,6 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
                         Save settings
                     </uui-button>
                 </div>
-
-                <uui-box headline="Set in appsettings (read-only)">
-                    <p class="muted intro">
-                        These are set by your developers in <code>appsettings.json</code>, under <code>Umbraco:Community:MediaGovernance</code>, and cannot be changed here.
-                    </p>
-                    <dl>
-                        <dt>Hide withheld images in pages</dt>
-                        <dd>${s.hideWithheldInPages ? "On: images that have expired, or whose people have not given consent, are left out of pages (using the <media-governance> tag helper)." : "Off: withheld images still show in pages."}</dd>
-                        <dt>Block withheld image files</dt>
-                        <dd>${s.blockWithheldFiles ? "On: the file of a withheld image returns a 404 to the public. Signed-in editors can still see it." : "Off: withheld images can still be reached by their address."}</dd>
-                        <dt>Consent detail</dt>
-                        <dd>
-                            ${[s.consentDetails ? "Date given and who gave it" : "", s.consentExpiry ? "Expiry" : "", s.consentEvidence ? "Evidence upload" : "", s.permittedUses.length > 0 ? `Permitted uses (${s.permittedUses.join(", ")})` : ""].filter(Boolean).map((t) => html`<uui-tag look="secondary">${t}</uui-tag> `)}
-                            ${!s.consentDetails && !s.consentExpiry && !s.consentEvidence && s.permittedUses.length === 0 ? "Off: consent is a yes or no on each person." : nothing}
-                        </dd>
-                        ${s.consentEvidence ? html`<dt>Evidence is kept in</dt><dd>${s.evidenceLocation}</dd>` : nothing}
-                        <dt>Who can use Governance</dt>
-                        <dd>${s.allowedUserGroups.length === 0 ? "No user groups." : s.allowedUserGroups.map((g) => html`<uui-tag look="secondary">${g}</uui-tag> `)}</dd>
-                    </dl>
-                </uui-box>
             </div>
         `;
     }
@@ -235,7 +215,6 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         .with-unit { display: flex; align-items: center; gap: var(--uui-size-space-3); }
         .with-unit span { color: var(--uui-color-text-alt); }
         .muted { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
-        .intro { margin-top: 0; }
         .error { color: var(--uui-color-danger-standalone); font-size: var(--uui-type-small-size); }
         .callout { padding: var(--uui-size-space-4) var(--uui-size-space-5); background: var(--uui-color-surface-alt); border-left: 4px solid var(--uui-color-warning); border-radius: var(--uui-border-radius); max-width: 560px; }
         .example { margin-top: var(--uui-size-space-5); padding: var(--uui-size-space-4) var(--uui-size-space-5); background: var(--uui-color-surface-alt); border-left: 3px solid var(--uui-color-interactive); border-radius: var(--uui-border-radius); }
@@ -243,9 +222,6 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
         uui-input { max-width: 520px; width: 100%; }
         .with-unit uui-input { width: 120px; }
         .groups { gap: var(--uui-size-space-3); }
-        dl { margin: 0; display: grid; grid-template-columns: 240px 1fr; gap: var(--uui-size-space-3) var(--uui-size-space-5); }
-        dt { font-weight: 600; }
-        dd { margin: 0; }
         .actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--uui-size-space-5); }
         .unsaved { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
     `];

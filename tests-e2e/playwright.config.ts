@@ -4,6 +4,7 @@ const url = process.env.MG_URL ?? "https://localhost:44399";
 
 export default defineConfig({
     testDir: "./tests",
+    globalSetup: "./global-setup.ts",
     timeout: 45_000,
     expect: { timeout: 10_000 },
     workers: 1, // one shared test site and database
