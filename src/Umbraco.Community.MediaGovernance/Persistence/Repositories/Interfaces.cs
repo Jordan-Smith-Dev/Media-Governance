@@ -54,6 +54,9 @@ public interface IAuditRepository
     Task WriteAsync(AuditRow row);
     Task<IReadOnlyList<AuditRow>> ListAsync(int take);
 
+    /// <summary>Newest first: entries about one person, optionally limited to the given actions.</summary>
+    Task<IReadOnlyList<AuditRow>> ListForPersonAsync(Guid personId, IReadOnlyCollection<string>? actions, int take);
+
 }
 
 public interface INotifiedRepository

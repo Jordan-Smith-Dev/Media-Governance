@@ -36,7 +36,11 @@ public class SettingsService(IKeyValueService keyValues, IOptions<MediaGovernanc
             a.HideWithheldInPages,
             a.ShowStatusSigns,
             a.ColourTreeIcons,
-            a.ShowFolderMarkers));
+            a.ShowFolderMarkers,
+            a.ConsentDetails,
+            a.ConsentExpiry,
+            a.ConsentEvidence,
+            a.PermittedUses.Where(u => !string.IsNullOrWhiteSpace(u)).Select(u => u.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList()));
     }
 
     public async Task<GovernanceOptions> SaveAsync(SettingsUpdate update)

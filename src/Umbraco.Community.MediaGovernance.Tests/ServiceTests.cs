@@ -7,7 +7,7 @@ public class PersonServiceTests
 {
     private readonly FakePersonRepository _people = new();
     private readonly FakeAuditRepository _auditRepo = new();
-    private PersonService Sut() => new(_people, new AuditService(_auditRepo));
+    private PersonService Sut() => new(_people, new AuditService(_auditRepo), new FakeSettings(), new EvidenceStore(new FakeEvidenceFiles()), new FixedTimeProvider(new DateOnly(2026, 11, 17)));
 
     [Fact]
     public async Task Create_requires_a_name() =>

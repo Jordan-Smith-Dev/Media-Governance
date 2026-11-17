@@ -31,6 +31,23 @@ namespace Umbraco.Community.MediaGovernance.Composers
             s.AddScoped<IMediaFileRepository, MediaFileRepository>();
 
             s.AddSingleton<GovernanceAccessChecker>();
+
+            // Evidence goes in a folder of its own in Umbraco's media file system (never served), or, if EvidenceStoragePath is
+            // set, in a folder on disk outside the website.
+            s.AddSingleton<IEvidenceFiles>(sp =>
+            {
+                var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MediaGovernanceOptions>>().Value;
+                if (!string.IsNullOrWhiteSpace(o.EvidenceStoragePath))
+                {
+                    var path = Path.IsPathRooted(o.EvidenceStoragePath)
+                        ? o.EvidenceStoragePath
+                        : sp.GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>().ContentRootPath is { } root ? Path.Combine(root, o.EvidenceStoragePath) : o.EvidenceStoragePath;
+                    return new DiskEvidenceFiles(path);
+                }
+                return new MediaEvidenceFiles(sp.GetRequiredService<Umbraco.Cms.Core.IO.MediaFileManager>(), o.EvidenceFolder);
+            });
+            s.AddSingleton<IEvidenceStore, EvidenceStore>();
+            s.AddScoped<PersonDataExporter>();
             s.AddScoped<IAuditService, AuditService>();
             s.AddScoped<ISettingsService, SettingsService>();
             s.AddScoped<ImageCatalog>();

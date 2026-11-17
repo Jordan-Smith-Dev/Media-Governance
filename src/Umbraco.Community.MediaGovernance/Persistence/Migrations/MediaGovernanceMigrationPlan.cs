@@ -13,7 +13,8 @@ public class MediaGovernanceMigrationPlan : PackageMigrationPlan
         To<CreateTablesMigration>(new Guid("0b0f4b1e-7c1a-4f0e-9c35-3f6a2d0e8a11"))
             .To<CreateMediaFileTableMigration>(new Guid("6c2a1f84-3b7d-4e59-8a10-9d4f5b2e7c33"))
             .To<AddJobTitleMigration>(new Guid("a41d7c2e-58b3-4f6a-9e12-3c8b0d5f7a64"))
-            .To<SimplifyConsentMigration>(new Guid("d3e8a5b1-9c47-4a2f-b6d0-17f4c8e92a05"));
+            .To<SimplifyConsentMigration>(new Guid("d3e8a5b1-9c47-4a2f-b6d0-17f4c8e92a05"))
+            .To<AddConsentDetailMigration>(new Guid("5b7e2c90-1d4a-4f83-a6c5-9e0b3d718f42"));
 }
 
 public class CreateTablesMigration : AsyncMigrationBase
@@ -96,5 +97,34 @@ public class SimplifyConsentMigration : AsyncMigrationBase
             Delete.Table(TableNames.LegacyConsent).Do();
 
         return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// Adds the optional consent detail to people: given on, given by, expiry, permitted uses and the evidence file.
+/// All nullable, so every existing consent stays exactly as it was ("given", with no extra detail).
+/// </summary>
+public class AddConsentDetailMigration : AsyncMigrationBase
+{
+    public AddConsentDetailMigration(IMigrationContext context) : base(context) { }
+
+    protected override Task MigrateAsync()
+    {
+        var isSqlite = DatabaseType.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+        var date = isSqlite ? "TEXT NULL" : "DATETIME NULL";
+        Add("ConsentGivenOn", date, isSqlite);
+        Add("ConsentGivenBy", isSqlite ? "TEXT NULL" : "NVARCHAR(30) NULL", isSqlite);
+        Add("ConsentExpiresOn", date, isSqlite);
+        Add("ConsentPermittedUses", isSqlite ? "TEXT NULL" : "NVARCHAR(500) NULL", isSqlite);
+        Add("ConsentEvidencePath", isSqlite ? "TEXT NULL" : "NVARCHAR(500) NULL", isSqlite);
+        return Task.CompletedTask;
+    }
+
+    private void Add(string column, string definition, bool isSqlite)
+    {
+        if (ColumnExists(TableNames.Person, column)) return;
+        Execute.Sql(isSqlite
+            ? $"ALTER TABLE {TableNames.Person} ADD COLUMN {column} {definition}"
+            : $"ALTER TABLE {TableNames.Person} ADD {column} {definition}").Do();
     }
 }
