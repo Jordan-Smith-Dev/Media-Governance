@@ -2,15 +2,25 @@ using Umbraco.Community.MediaGovernance.Core.Models;
 
 namespace Umbraco.Community.MediaGovernance.Controllers;
 
-public record PersonDto(Guid Id, string Name, string? Email, string? Phone, Guid? LinkedMemberKey, Guid? LinkedUserKey, string? JobTitle, int TaggedInCount, bool ConsentGiven = false, DateTime? ConsentUpdatedUtc = null);
+public record PersonDto(
+    Guid Id, string Name, string? Email, string? Phone, Guid? LinkedMemberKey, Guid? LinkedUserKey, string? JobTitle, int TaggedInCount,
+    bool ConsentGiven = false, DateTime? ConsentUpdatedUtc = null,
+    // Consent is "in force" when it has been given and, if expiry is on, has not run out. Pills and tags use this.
+    bool ConsentInForce = false, bool ConsentExpired = false,
+    // Optional detail, each null unless its option is switched on.
+    DateOnly? ConsentGivenOn = null, string? ConsentGivenBy = null, DateOnly? ConsentExpiresOn = null,
+    IReadOnlyList<string>? ConsentPermittedUses = null,
+    bool HasEvidence = false, string? EvidenceType = null, long? EvidenceSizeBytes = null);
 
 public record PersonRequest(string Name, string? Email, string? Phone, Guid? LinkedMemberKey, Guid? LinkedUserKey, string? JobTitle = null);
 
-/// <summary>Sets whether a person has given consent.</summary>
-public record ConsentChangeRequest(bool Given);
+/// <summary>Sets whether a person has given consent, with whichever optional detail is switched on.</summary>
+public record ConsentChangeRequest(bool Given, DateOnly? GivenOn = null, string? GivenBy = null, DateOnly? ExpiresOn = null, IReadOnlyList<string>? PermittedUses = null);
+
+public record EvidenceEventDto(string Action, DateTime WhenUtc, string Actor);
 
 /// <summary>A person tagged on an image, with whether they have given consent.</summary>
-public record TaggedPersonDto(Guid PersonId, string Name, bool ConsentGiven);
+public record TaggedPersonDto(Guid PersonId, string Name, bool ConsentGiven, bool ConsentExpired = false);
 
 /// <summary>One page of people. <paramref name="Total"/> is how many match, so the screen can offer "load more".</summary>
 public record PeoplePage(IReadOnlyList<PersonDto> Items, int Total);
@@ -34,6 +44,7 @@ public record ImageGovernanceDto(
     GovernanceStatus Status,
     IReadOnlyList<GovernanceStatus> Issues,
     IReadOnlyList<TaggedPersonDto> People,
+    IReadOnlyList<string> ClearedUses,
     DateOnly? DateUploaded = null,
     DateOnly? ExifDateTaken = null);
 
@@ -60,4 +71,9 @@ public record SettingsDto(
     bool HideWithheldInPages,
     IReadOnlyList<string> AllowedUserGroups,
     bool ShowStatusSigns = false,
-    bool ShowFolderMarkers = false);
+    bool ShowFolderMarkers = false,
+    bool ConsentDetails = false,
+    bool ConsentExpiry = false,
+    bool ConsentEvidence = false,
+    IReadOnlyList<string>? PermittedUses = null,
+    string? EvidenceLocation = null);

@@ -26,9 +26,16 @@ public record GovernanceOptions(
     bool HideWithheldInPages = true,
     bool ShowStatusSigns = false,
     bool ColourTreeIcons = false,
-    bool ShowFolderMarkers = false)
+    bool ShowFolderMarkers = false,
+    bool ConsentDetails = false,
+    bool ConsentExpiry = false,
+    bool ConsentEvidence = false,
+    IReadOnlyList<string>? PermittedUses = null)
 {
     public GovernanceSettings ToCore() => new(RetentionYears, WarningDays);
+
+    /// <summary>True when consents are recorded per use (a list of permitted uses is configured).</summary>
+    public bool UsesOn => PermittedUses is { Count: > 0 };
 
     public static GovernanceOptions Default { get; } = new(3, 90, []);
 }

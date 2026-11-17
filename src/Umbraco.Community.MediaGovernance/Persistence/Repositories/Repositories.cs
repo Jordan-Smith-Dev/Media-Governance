@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Options;
 using Umbraco.Cms.Infrastructure.Scoping;
+using Umbraco.Community.MediaGovernance.Middleware;
+using Umbraco.Community.MediaGovernance.Services;
 using Umbraco.Community.MediaGovernance.Core.Models;
 using Umbraco.Community.MediaGovernance.Persistence.Schema;
 
@@ -50,7 +53,7 @@ public class PersonRepository(IScopeProvider scopeProvider) : IPersonRepository
     }
 }
 
-public class ImageRepository(IScopeProvider scopeProvider) : IImageRepository
+public class ImageRepository(IScopeProvider scopeProvider, IOptions<MediaGovernanceOptions> options) : IImageRepository
 {
     private const int MaxKeysForTargetedQuery = 200;
 
@@ -139,7 +142,11 @@ public class ImageRepository(IScopeProvider scopeProvider) : IImageRepository
 
         var images = imageRows.ToDictionary(i => i.MediaKey);
         var tags = tagRows.ToLookup(t => t.MediaKey, t => t.PersonId);
-        var consentedPeople = personRows.Where(p => p.ConsentGiven).Select(p => p.Id).ToHashSet();
+        var o = options.Value;
+        var uses = o.PermittedUses.Any(u => !string.IsNullOrWhiteSpace(u));
+        var consentByPerson = personRows
+            .Select(p => ConsentFactsFactory.Create(p, o.ConsentDetails, o.ConsentExpiry, uses))
+            .Where(c => c is not null).ToDictionary(c => c!.PersonId, c => c!);
 
         return wanted.Select(key =>
         {
@@ -151,8 +158,8 @@ public class ImageRepository(IScopeProvider scopeProvider) : IImageRepository
                 Dates.FromDb(row?.CustomExpiry),
                 row?.NoPeople ?? false,
                 tags[key].ToList(),
-                // Consent is a yes/no on the person: a "yes" counts as in force, with no dates or limits.
-                tags[key].Where(consentedPeople.Contains).Select(id => new ConsentFacts(id, ConsentFacts.Always, null, null)).ToList());
+                // Consent belongs to the person: their yes, plus any detail an option has switched on.
+                tags[key].Where(consentByPerson.ContainsKey).Select(id => consentByPerson[id]).ToList());
         }).ToList();
     }
 }
@@ -204,6 +211,14 @@ public class AuditRepository(IScopeProvider scopeProvider) : IAuditRepository
         using var scope = scopeProvider.CreateScope();
         scope.Database.Insert(row);
         scope.Complete();
+    }
+
+    public async Task<IReadOnlyList<AuditRow>> ListForPersonAsync(Guid personId, IReadOnlyCollection<string>? actions, int take)
+    {
+        using var scope = scopeProvider.CreateScope(autoComplete: true);
+        var rows = scope.Database.Fetch<AuditRow>($"SELECT * FROM {TableNames.Audit} WHERE PersonId = @0 ORDER BY Id DESC", personId);
+        if (actions is { Count: > 0 }) rows = rows.Where(r => actions.Contains(r.Action)).ToList();
+        return rows.Take(take).ToList();
     }
 
     public async Task<IReadOnlyList<AuditRow>> ListAsync(int take)

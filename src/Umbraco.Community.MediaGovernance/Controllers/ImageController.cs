@@ -124,7 +124,9 @@ public class ImageController(
         o.NotificationEmails, o.NotificationUserGroupIds ?? [],
         o.BlockWithheldFiles, o.HideWithheldInPages,
         access.AllowedGroups,
-        o.ShowStatusSigns, o.ShowFolderMarkers);
+        o.ShowStatusSigns, o.ShowFolderMarkers,
+        o.ConsentDetails, o.ConsentExpiry, o.ConsentEvidence, o.PermittedUses ?? [],
+        o.ConsentEvidence ? (string.IsNullOrWhiteSpace(settings.AppSettings.EvidenceStoragePath) ? $"Media folder \"{settings.AppSettings.EvidenceFolder}\" (never served to the public)" : "A folder on disk set in appsettings") : null);
 
     private async Task<ImageGovernanceDto> BuildAsync(Guid mediaKey)
     {
@@ -136,7 +138,7 @@ public class ImageController(
         var facts = new ImageGovernanceFacts(
             mediaKey, Dates.FromDb(image.DateTaken), Dates.FromDb(image.DateObtained), Dates.FromDb(image.CustomExpiry),
             image.NoPeople, tagged,
-            taggedPeople.Where(p => p.ConsentGiven).Select(p => new ConsentFacts(p.Id, ConsentFacts.Always, null, null)).ToList(),
+            taggedPeople.Select(p => ConsentFactsFactory.Create(p, governanceOptions)).OfType<ConsentFacts>().ToList(),
             uploaded);
         var today = DateOnly.FromDateTime(time.GetLocalNow().DateTime);
 
@@ -146,7 +148,10 @@ public class ImageController(
             StatusCalculator.ExpirySourceOf(facts, options),
             StatusCalculator.Calculate(facts, options, today),
             StatusCalculator.Issues(facts, options, today),
-            taggedPeople.OrderBy(p => p.Name).Select(p => new TaggedPersonDto(p.Id, p.Name, p.ConsentGiven)).ToList(),
+            taggedPeople.OrderBy(p => p.Name).Select(p => new TaggedPersonDto(p.Id, p.Name,
+                ConsentFactsFactory.InForce(p, governanceOptions.ConsentDetails, governanceOptions.ConsentExpiry, today),
+                ConsentFactsFactory.Expired(p, governanceOptions.ConsentExpiry, today))).ToList(),
+            governanceOptions.UsesOn ? StatusCalculator.ClearedUses(facts, governanceOptions.PermittedUses!, today) : [],
             uploaded,
             facts.DateTaken is null ? await photoDates.FindAsync(mediaKey) : null);
     }

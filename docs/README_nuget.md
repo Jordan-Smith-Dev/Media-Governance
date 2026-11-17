@@ -4,14 +4,46 @@ Know which images in your media library you are allowed to use. Media Governance
 
 It has **no dependency on Umbraco UI Builder** or any other paid package.
 
+## What it looks like
+
+### By default: consent is a yes or no
+
+Out of the box, consent is a single tick on the person. Everything is in one **Governance** page in the Media section.
+
+**Overview.** Every image with its status, who is pictured, whether they have consented, and when it expires. Filter, sort, export, and act on many images at once.
+
+![The Governance overview: status tiles, and a table of every image with people, expiry, consent and status](https://raw.githubusercontent.com/Jordan-Smith-Dev/Media-Governance/main/docs/images/overview.png)
+
+**People.** Add people once, tick *Consent given*, and every image they are tagged in follows.
+
+![A person's panel: details, a Consent given tick, and the images they are tagged in](https://raw.githubusercontent.com/Jordan-Smith-Dev/Media-Governance/main/docs/images/default-person.png)
+
+**On an image.** Tag the people pictured. Each person shows green (consent given) or red (no consent), and the expiry is worked out from the retention period.
+
+![An image's Governance tab: dates, an Expiry with an Expired tag, and tagged people shown green or red](https://raw.githubusercontent.com/Jordan-Smith-Dev/Media-Governance/main/docs/images/default-image.png)
+
+**Settings.** Only what an editor can change: how long images are kept, the warning window, and who gets the daily email. Everything else is configured by developers in `appsettings.json`.
+
+![The Settings tab: retention, warning window and notification recipients](https://raw.githubusercontent.com/Jordan-Smith-Dev/Media-Governance/main/docs/images/settings.png)
+
+### With the optional consent detail switched on
+
+For clients who need to show more, four independent settings (all off by default, see *Optional consent detail* in the repository README) add the date and who gave consent, an expiry, the uses it covers, and a signed form kept privately.
+
+![A person's panel with consent detail on: given on, given by, expires on, permitted uses, and an uploaded evidence file](https://raw.githubusercontent.com/Jordan-Smith-Dev/Media-Governance/main/docs/images/detailed-person.png)
+
+An image then shows which uses everyone pictured has agreed to, and a consent that has run out is flagged and makes the image Expired.
+
+![An image with consent detail on: Cleared for tags, and a person whose consent has expired](https://raw.githubusercontent.com/Jordan-Smith-Dev/Media-Governance/main/docs/images/detailed-image.png)
+
 ## Features
 
 - **A Governance page** in the Media section, opened from "Governance" in the sidebar and laid out like Umbraco's Log Viewer. Its tabs are **Overview** (filter tiles for All images, Needs tagging, No consent, Expiring soon and Expired, a searchable, sortable table, and CSV export), **People**, **Pages affected** and **Settings**.
 - **Optional status indicators in the media tree** (signs and coloured icons), off by default so the tree looks like a normal Umbraco one. Turn them on in `appsettings.json`.
 - **Governance tab on every image**: date taken, date obtained, **Expiry** (worked out from the retention period, with a red *Expired* tag once it has passed, and overridable with your own date), and the people pictured. Each tagged person is green (consent given) or red (no consent) and links to their record.
-- **Consent is a yes or no on the person**, set with a checkbox on their record, so one change applies to every image they are in. Every change is audited with who made it.
+- **Consent is a yes or no on the person**, set with a checkbox on their record, so one change applies to every image they are in. Every change is audited with who made it. For clients who need more, optional settings (all off by default) add the date consent was given and who gave it, an expiry, permitted uses (with "cleared for" tags on images), and evidence upload to a private folder.
 - **People repository**: a list with search, a slide-out editor, and the images each person is tagged in. People can be linked to an Umbraco member and/or user.
-- **Deletion on request**: permanently delete a person's details and consent in one action. The audit log keeps an anonymised entry only.
+- **Subject access and deletion on request**: download everything held about a person as a zip, or permanently delete their details, consent and evidence in one action. The audit log keeps an anonymised entry only.
 - **Optional folder markers** (red or amber) when a folder contains images that cannot be used or need attention, also off by default.
 - **Select rows and export just those** from the overview. The Export button exports the ticked images, or everything matching the current filter when none are ticked.
 - **Bulk actions on ticked images:** mark them as having no people (images that already have someone tagged are left alone), or set or remove an expiry date on all of them. Each image is audited.
@@ -45,7 +77,7 @@ Then wrap any markup that shows a media item. Nothing is rendered when the image
 
 Use `key="@someGuid"` instead of `media` when you only have the media key.
 
-`HideWithheldInPages` in `appsettings.json` switches this behaviour for the whole site (it is read-only in the CMS). When it is off, the tag helper renders its content as normal (and still writes the log warning, so you can find the pages). `IMediaGovernanceUsage` always reports the true status.
+`HideWithheldInPages` in `appsettings.json` switches this behaviour for the whole site (it is not shown in the CMS). When it is off, the tag helper renders its content as normal (and still writes the log warning, so you can find the pages). `IMediaGovernanceUsage` always reports the true status.
 
 **Service.** For logic in controllers or views, inject `IMediaGovernanceUsage`:
 
@@ -67,7 +99,7 @@ Limitations:
 
 Hiding an image in a page does not stop someone who already has its URL, or finds it through a search engine. So the package also stops **withheld** images being served: a request for the file of an Expired image, or an image of someone who has not consented, returns **404** to everyone except signed-in backoffice users (so editors can still see the image to fix it). Images that are not withheld are untouched, including resized (`?width=…`) requests.
 
-- On by default. Set `Umbraco:Community:MediaGovernance:BlockWithheldMediaFiles` to `false` in `appsettings.json` to turn it off. The Settings tab shows the current value, read-only.
+- On by default. Set `Umbraco:Community:MediaGovernance:BlockWithheldMediaFiles` to `false` in `appsettings.json` to turn it off. It is not shown in the CMS.
 - It only applies to images that have governance data (tagged people or dates). A newly installed site starts with everything allowed, and files become blocked as images are tagged and consent is missing or expires.
 - Each blocked request writes a log warning (de-duplicated), the same as the tag helper.
 - Status is cached for up to 30 seconds. Changes made in the backoffice apply immediately on the server where they were made; other servers in a load-balanced setup can lag by up to 30 seconds.
@@ -113,11 +145,12 @@ The package creates its own tables (`mgPerson`, `mgImage`, `mgImagePerson`, `mgA
 
 - The overview can be sorted by any date, name, folder or status column. The status, search and sort are kept in the address, so a view can be bookmarked or shared.
 - Notifications use Umbraco's configured email settings and run on the scheduling server only.
-- Settings start in `appsettings.json`. In the CMS only the notification recipients, retention period and warning window can be changed; everything else is shown read-only. See the repository README for the full list.
+- Settings start in `appsettings.json`. In the CMS only the notification recipients, retention period and warning window can be changed; everything else is set in `appsettings.json` only and is not shown to editors. See the repository README for the full list.
 
 ## Known limitations
 
-- **Consent is only a yes or no.** The package does not store what was agreed, when, for how long, or a copy of the form. The audit log records who changed a consent and when.
+- **By default consent is only a yes or no.** Unless you switch on the optional detail, the package does not store what was agreed, when, for how long, or a copy of the form. The audit log records who changed a consent and when.
+- **Evidence storage.** Evidence is kept in a private folder of the media file system, which the package never serves. If your media is stored in a blob store or served from a CDN, set `EvidenceStoragePath` to a folder on disk instead.
 - **Signs on cards in the media grid are experimental.** The tree signs, coloured icons and folder markers are off by default. In the tree they work, but the card wrapper used for the grid view did not display cards when we registered it, so it is only added when `ShowStatusSigns` or `ShowFolderMarkers` is turned on, and that path has not been fixed or tested. Leave them off unless you are prepared to check the grid.
 - **Access is by user group.** Anyone in a configured group sees governance data for all images, including people's names and consent. Media start nodes are not applied.
 

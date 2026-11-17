@@ -65,6 +65,13 @@ export async function snapshotImage(page: Page, mediaKey: string) {
     return { original, restore: () => api(page, "PUT", `image/${mediaKey}`, original) };
 }
 
+/** Ticks a permitted use in the person modal only if it is not already ticked (withdrawn consent keeps its detail, so a use can come pre-ticked). */
+export async function tickUse(modal: import("@playwright/test").Locator, use: string) {
+    const box = modal.locator(`uui-checkbox[label='${use}']`);
+    await expect(box).toBeVisible();
+    if (!(await box.evaluate((e) => (e as unknown as { checked: boolean }).checked))) await box.click();
+}
+
 export { mediaKeyFor };
 
 export type PersonSummary = { id: string; name: string; consentGiven: boolean };

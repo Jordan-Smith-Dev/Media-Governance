@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Events;
@@ -10,6 +11,12 @@ using Umbraco.Community.MediaGovernance.Services;
 
 namespace Umbraco.Community.MediaGovernance.TestSite;
 
+/// <summary>Set once the sample data has been created, so the browser tests can wait for it (see /test-site-ready).</summary>
+public static class SeedState
+{
+    public static volatile bool Done;
+}
+
 /// <summary>Seeds the test site with the 12 images and 6 people from the design prototype (test site only; never part of the package).</summary>
 public class SeedDataComposer : IComposer
 {
@@ -17,7 +24,7 @@ public class SeedDataComposer : IComposer
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, SeedDataHandler>();
 }
 
-public class SeedDataHandler(IServiceScopeFactory scopes, IWebHostEnvironment web) : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
+public class SeedDataHandler(IServiceScopeFactory scopes, IWebHostEnvironment web, ILogger<SeedDataHandler> logger) : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
     private const string Actor = "seed";
 
@@ -69,9 +76,18 @@ public class SeedDataHandler(IServiceScopeFactory scopes, IWebHostEnvironment we
 
     public async Task HandleAsync(UmbracoApplicationStartedNotification notification, CancellationToken cancellationToken)
     {
-        await SeedCoreAsync();
-        await SeedRootImagesAsync();
-        await SeedPagesAsync();
+        try
+        {
+            await SeedCoreAsync();
+            await SeedRootImagesAsync();
+            await SeedPagesAsync();
+            SeedState.Done = true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Seeding the test site failed.");
+            throw;
+        }
     }
 
     /// <summary>Images that sit directly in the media root, not in a folder (to prove folders are only organisation).</summary>
@@ -168,8 +184,10 @@ public class SeedDataHandler(IServiceScopeFactory scopes, IWebHostEnvironment we
                 new PersonInput(name, $"{name.Split(' ')[0].ToLowerInvariant()}@example.com", null, null, null), Actor)).Id;
 
         // Consent belongs to the person: anyone listed as consented on any image has given it.
+        // The test site switches the optional consent detail on, so a consent also records the permitted uses (when configured).
+        var uses = (await sp.GetRequiredService<ISettingsService>().GetAsync()).PermittedUses;
         foreach (var name in Images.SelectMany(i => i.Consented).Distinct())
-            await people.SetConsentAsync(personIds[name], true, Actor);
+            await people.SetConsentAsync(personIds[name], new ConsentChange(true, PermittedUses: uses is { Count: > 0 } ? uses : null), Actor);
 
         var folders = Images.Select(i => i.Folder).Distinct().ToDictionary(f => f, f =>
         {

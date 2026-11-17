@@ -31,6 +31,12 @@ public class PersonRow
     [Column("LinkedUserKey")] [NullSetting(NullSetting = NullSettings.Null)] public Guid? LinkedUserKey { get; set; }
     [Column("ConsentGiven")] public bool ConsentGiven { get; set; }
     [Column("ConsentUpdatedUtc")] [NullSetting(NullSetting = NullSettings.Null)] public DateTime? ConsentUpdatedUtc { get; set; }
+    // Optional consent detail (see the ConsentDetails, ConsentExpiry, PermittedUses and ConsentEvidence options).
+    [Column("ConsentGivenOn")] [NullSetting(NullSetting = NullSettings.Null)] public DateTime? ConsentGivenOn { get; set; }
+    [Column("ConsentGivenBy")] [NullSetting(NullSetting = NullSettings.Null)] [Length(30)] public string? ConsentGivenBy { get; set; }
+    [Column("ConsentExpiresOn")] [NullSetting(NullSetting = NullSettings.Null)] public DateTime? ConsentExpiresOn { get; set; }
+    [Column("ConsentPermittedUses")] [NullSetting(NullSetting = NullSettings.Null)] [Length(500)] public string? ConsentPermittedUses { get; set; }
+    [Column("ConsentEvidencePath")] [NullSetting(NullSetting = NullSettings.Null)] [Length(500)] public string? ConsentEvidencePath { get; set; }
     [Column("CreatedUtc")] public DateTime CreatedUtc { get; set; }
 }
 

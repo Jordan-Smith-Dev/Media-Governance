@@ -113,7 +113,7 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
                             <uui-table-cell>${p.jobTitle ?? "—"}</uui-table-cell>
                             <uui-table-cell>${p.email ?? "—"}</uui-table-cell>
                             <uui-table-cell>
-                                <uui-tag class="pill" look="primary" color=${p.consentGiven ? "positive" : "danger"}>${p.consentGiven ? "Consent given" : "No consent"}</uui-tag>
+                                <uui-tag class="pill" look="primary" color=${p.consentInForce ? "positive" : "danger"} title=${p.consentExpired ? "Consent was given, but its end date has passed" : ""}>${p.consentInForce ? "Consent given" : p.consentExpired ? "Consent expired" : "No consent"}</uui-tag>
                             </uui-table-cell>
                             <uui-table-cell>
                                 ${p.linkedMemberKey ? html`<uui-tag>Member</uui-tag>` : nothing}

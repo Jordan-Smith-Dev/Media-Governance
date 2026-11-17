@@ -32,14 +32,12 @@ test("Only retention, the warning window and recipients can be changed here", as
     await expect(settings.locator('uui-input[label="Warning window in days"]')).toBeVisible();
     await expect(settings.locator('uui-textarea[label="Notification email addresses"]')).toBeVisible();
 
-    // Everything else is read-only: no switches for the front end or the media tree, and no permitted uses.
+    // Everything else lives in appsettings only and is not shown to editors: no switches, no list of the settings.
     await expect(settings.locator("uui-toggle")).toHaveCount(0);
-    await expect(settings.getByText("Set in appsettings (read-only)")).toBeVisible();
-    await expect(settings.getByText("Hide withheld images in pages")).toBeVisible();
-    await expect(settings.getByText("Block withheld image files")).toBeVisible();
-    await expect(settings.getByText("Permitted uses")).toHaveCount(0);
-    await expect(settings.getByText("Media tree")).toHaveCount(0);
-    await expect(settings.getByText("Who can use Governance")).toBeVisible();
+    await expect(settings.getByText("appsettings", { exact: false }).filter({ hasText: "read-only" })).toHaveCount(0);
+    for (const hidden of ["Set in appsettings", "Hide withheld images in pages", "Block withheld image files", "Who can use Governance", "Consent detail", "Evidence is kept in", "Media tree"])
+        await expect(settings.getByText(hidden), hidden).toHaveCount(0);
+    await expect(settings.locator('uui-input[label="Permitted uses"], uui-textarea[label="Permitted uses"]')).toHaveCount(0);
 });
 
 test("Retention shows its appsettings value, warns that it changes existing images, and saves", async ({ page }) => {

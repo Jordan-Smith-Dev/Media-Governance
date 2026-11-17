@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, login, mediaKeyFor, openGovernance, personFor, view } from "./helpers";
+import { api, login, mediaKeyFor, openGovernance, personFor, tickUse, view } from "./helpers";
 
 const modal = (page: import("@playwright/test").Page) => page.locator("umb-media-governance-person-modal");
 
@@ -44,6 +44,7 @@ test("Giving consent is saved on the person and changes every image they are in"
         await page.goto(view("people"));
         await page.getByRole("button", { name: "Tom Reyes" }).first().click();
         await modal(page).locator("uui-checkbox[label='Consent given']").click();
+        await tickUse(modal(page), "Web");   // the test site lists permitted uses, so one is needed
         await modal(page).locator('uui-button[label="Save"]').click();
         await expect(page.getByText("Person saved").first()).toBeVisible();
 
@@ -90,6 +91,7 @@ test("A person can be added with consent, and shows in the list", async ({ page 
         await page.getByRole("button", { name: "Add person" }).click();
         await modal(page).getByRole("textbox", { name: "Name" }).fill(name);
         await modal(page).locator("uui-checkbox[label='Consent given']").click();
+        await tickUse(modal(page), "Web");
         await modal(page).locator('uui-button[label="Save"]').click();
         await expect(page.getByText("Person saved").first()).toBeVisible();
 
