@@ -59,16 +59,39 @@ export type Person = {
     /** Whether the person has given consent to appear in images. */
     consentGiven: boolean;
     consentUpdatedUtc: string | null;
+    /** Given and, if expiry is on, not run out. Pills and tags use this. */
+    consentInForce: boolean;
+    /** Given, but its end date has passed. */
+    consentExpired: boolean;
+    /** Optional detail: each is null unless its option is switched on. */
+    consentGivenOn: string | null;
+    consentGivenBy: string | null;
+    consentExpiresOn: string | null;
+    consentPermittedUses: string[] | null;
+    hasEvidence: boolean;
+    evidenceType: string | null;
+    evidenceSizeBytes: number | null;
 };
 
-export type PersonRequest = Omit<Person, "id" | "taggedInCount" | "consentGiven" | "consentUpdatedUtc">;
+export type PersonRequest = Pick<Person, "name" | "email" | "phone" | "linkedMemberKey" | "linkedUserKey" | "jobTitle">;
+
+/** What to record for a person's consent. Detail is only used while its option is switched on. */
+export type ConsentChange = {
+    given: boolean;
+    givenOn?: string | null;
+    givenBy?: string | null;
+    expiresOn?: string | null;
+    permittedUses?: string[] | null;
+};
+
+export type EvidenceEvent = { action: string; whenUtc: string; actor: string };
 
 /** One page of people. `total` is how many match, so the screen can offer "load more". */
 export type PeoplePage = { items: Person[]; total: number };
 export type PersonImagesPage = { items: PersonImage[]; total: number };
 
 /** A person tagged on an image, with whether they have given consent. */
-export type TaggedPerson = { personId: string; name: string; consentGiven: boolean };
+export type TaggedPerson = { personId: string; name: string; consentGiven: boolean; consentExpired: boolean };
 
 /** An image a person is tagged in. */
 export type PersonImage = { mediaKey: string; name: string; folder: string; status: GovernanceStatus };
@@ -89,6 +112,8 @@ export type ImageGovernance = {
     issues: GovernanceStatus[];
     /** The people tagged on this image, with their consent. */
     people: TaggedPerson[];
+    /** The uses everyone pictured has agreed to. Empty unless permitted uses are configured. */
+    clearedUses: string[];
     dateUploaded: string | null;
     /** Date found in the photo's camera data; only sent while Date taken is empty. */
     exifDateTaken?: string | null;
@@ -129,6 +154,13 @@ export type Settings = {
     /** Signs and folder markers on cards in the media grid (appsettings, off by default). */
     showStatusSigns: boolean;
     showFolderMarkers: boolean;
+    /** Optional consent detail (appsettings, all off by default). */
+    consentDetails: boolean;
+    consentExpiry: boolean;
+    consentEvidence: boolean;
+    permittedUses: string[];
+    /** Where evidence is kept, in words, when evidence is on. */
+    evidenceLocation: string | null;
 };
 
 export type SettingsUpdate = {
@@ -232,8 +264,33 @@ export class GovernanceApi {
         return this.#json<BulkImageResult>("POST", "images/bulk", { mediaKeys, noPeople: false, clearCustomExpiry: false, ...change });
     }
 
-    setConsent(personId: string, given: boolean) {
-        return this.#json<Person>("PUT", `people/${personId}/consent`, { given });
+    setConsent(personId: string, change: ConsentChange) {
+        return this.#json<Person>("PUT", `people/${personId}/consent`, change);
+    }
+    /** Fetches the evidence with the backoffice credentials. Each call is audited as a view. */
+    async evidence(personId: string): Promise<Blob> {
+        return (await this.#request("GET", `people/${personId}/evidence`, { parseAs: "blob" })) as Blob;
+    }
+    evidenceHistory(personId: string) {
+        return this.#json<EvidenceEvent[]>("GET", `people/${personId}/evidence/history`);
+    }
+    async removeEvidence(personId: string): Promise<Person> {
+        return (await this.#request("DELETE", `people/${personId}/evidence`)) as Person;
+    }
+    async uploadEvidence(personId: string, file: File): Promise<Person> {
+        const form = new FormData();
+        form.append("file", file);
+        return (await this.#request("POST", `people/${personId}/evidence`, { form })) as Person;
+    }
+    /** Everything held about the person, as a zip, for a subject access request. */
+    async exportPerson(personId: string, fileName: string): Promise<void> {
+        const blob = (await this.#request("GET", `people/${personId}/export`, { parseAs: "blob" })) as Blob;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
     }
     personImages(personId: string, skip = 0, take = 25) {
         return this.#json<PersonImagesPage>("GET", `people/${personId}/images?skip=${skip}&take=${take}`);

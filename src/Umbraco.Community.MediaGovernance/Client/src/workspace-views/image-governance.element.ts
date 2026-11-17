@@ -1,7 +1,7 @@
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UMB_MEDIA_WORKSPACE_CONTEXT } from "@umbraco-cms/backoffice/media";
 import { GovernanceElement, errorMessage } from "../api/governance-element.js";
-import type { ImageGovernance, Person, TaggedPerson } from "../api/index.js";
+import type { ImageGovernance, Person, Settings, TaggedPerson } from "../api/index.js";
 import { daysUntil, formatDate, relativeTime } from "../dashboard/format.js";
 
 const MAX_SUGGESTIONS = 8;
@@ -19,6 +19,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     #known = new Map<string, TaggedPerson>();
     #searchTimer?: number;
     @state() private _error = "";
+    @state() private _settings?: Settings;
     @state() private _saveState: "idle" | "saving" | "saved" = "idle";
     @state() private _personSearch = "";
     #pending: Promise<unknown> = Promise.resolve();
@@ -39,7 +40,8 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     async #load() {
         this._error = "";
         try {
-            const data = await this.api.image(this._mediaKey);
+            const [data, settings] = await Promise.all([this.api.image(this._mediaKey), this._settings ? Promise.resolve(this._settings) : this.api.settings().catch(() => undefined)]);
+            this._settings = settings;
             this.#remember(data);
             this._data = data;
             await this.#search();
@@ -94,7 +96,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
 
     #addPerson(person: Person) {
         if (!this._data || this._data.taggedPersonIds.includes(person.id)) return;
-        this.#known.set(person.id, { personId: person.id, name: person.name, consentGiven: person.consentGiven });
+        this.#known.set(person.id, { personId: person.id, name: person.name, consentGiven: person.consentInForce, consentExpired: person.consentExpired });
         this.#patch({ taggedPersonIds: [...this._data.taggedPersonIds, person.id], noPeople: false });
         this._personSearch = "";
         void this.#search();
@@ -168,6 +170,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                     <umb-property-layout label="Contains no people" description="Tick when nobody is pictured, so the image does not need tagging.">
                         <uui-toggle slot="editor" label="Contains no people" .checked=${d.noPeople} ?disabled=${d.taggedPersonIds.length > 0} @change=${(e: Event) => this.#patch({ noPeople: (e.target as HTMLInputElement).checked })}></uui-toggle>
                     </umb-property-layout>
+                    ${this.#renderCleared(d)}
                     <umb-property-layout label="Tagged people" description="Green: the person has given consent. Red: they have not. Consent is recorded on the person, in Governance, People.">
                         <div slot="editor" class="people">${this.#renderPeoplePicker(d)}</div>
                     </umb-property-layout>
@@ -178,6 +181,22 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                     Governance details save as you change them. The Save button below saves the media item itself.
                 </p>
             </div>
+        `;
+    }
+
+    /** Which uses (Web, Print...) everyone pictured has agreed to. Only shown when permitted uses are configured. */
+    #renderCleared(d: ImageGovernance) {
+        const uses = this._settings?.permittedUses ?? [];
+        if (uses.length === 0 || d.taggedPersonIds.length === 0) return nothing;
+        return html`
+            <umb-property-layout label="Cleared for" description="The uses everyone pictured has agreed to. A use is only cleared when every tagged person has agreed to it.">
+                <div slot="editor" class="cleared">
+                    ${uses.map((u) => {
+                        const ok = d.clearedUses.some((c) => c.toLowerCase() === u.toLowerCase());
+                        return html`<uui-tag look="primary" color=${ok ? "positive" : "danger"} title=${ok ? `Cleared for ${u}: everyone tagged has agreed to it` : `Not cleared for ${u}: someone tagged has not agreed to it`}>${ok ? "✓" : "✕"} ${u}</uui-tag>`;
+                    })}
+                </div>
+            </umb-property-layout>
         `;
     }
 
@@ -216,10 +235,10 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
                     const p = this.#known.get(id);
                     const given = p?.consentGiven ?? false;
                     return html`
-                        <uui-tag class="person" color=${given ? "positive" : "danger"} look="primary" title=${given ? "Has given consent" : "Has not given consent"}>
+                        <uui-tag class="person" color=${given ? "positive" : "danger"} look="primary" title=${given ? "Has given consent" : p?.consentExpired ? "Consent was given, but its end date has passed" : "Has not given consent"}>
                             <span class="person-row">
                                 <a class="person-link" href=${personHref(id)}>${p?.name ?? "Unknown person"}</a>
-                                <span class="consent-label">${given ? "Consent given" : "No consent"}</span>
+                                <span class="consent-label">${given ? "Consent given" : p?.consentExpired ? "Consent expired" : "No consent"}</span>
                                 <uui-button class="remove" compact label="Remove ${p?.name ?? "person"}" @click=${() => this.#removePerson(id)}>
                                     <uui-icon name="icon-wrong"></uui-icon>
                                 </uui-button>
@@ -253,6 +272,7 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
         umb-property-layout:last-of-type { padding-bottom: 0; }
         .expiry { display: flex; align-items: center; gap: var(--uui-size-space-4); flex-wrap: wrap; }
         .people { display: flex; flex-direction: column; gap: var(--uui-size-space-4); }
+        .cleared { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); }
         .tags, .suggestions { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); align-items: center; }
         .muted { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
         .autosave-note { margin: 0; color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); text-align: right; }

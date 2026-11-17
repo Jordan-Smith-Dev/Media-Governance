@@ -9,9 +9,9 @@ It has **no dependency on Umbraco UI Builder** or any other paid package.
 - **A Governance page** in the Media section, opened from "Governance" in the sidebar and laid out like Umbraco's Log Viewer. Its tabs are **Overview** (filter tiles for All images, Needs tagging, No consent, Expiring soon and Expired, a searchable, sortable table, and CSV export), **People**, **Pages affected** and **Settings**.
 - **Optional status indicators in the media tree** (signs and coloured icons), off by default so the tree looks like a normal Umbraco one. Turn them on in `appsettings.json`.
 - **Governance tab on every image**: date taken, date obtained, **Expiry** (worked out from the retention period, with a red *Expired* tag once it has passed, and overridable with your own date), and the people pictured. Each tagged person is green (consent given) or red (no consent) and links to their record.
-- **Consent is a yes or no on the person**, set with a checkbox on their record, so one change applies to every image they are in. Every change is audited with who made it.
+- **Consent is a yes or no on the person**, set with a checkbox on their record, so one change applies to every image they are in. Every change is audited with who made it. For clients who need more, optional settings (all off by default) add the date consent was given and who gave it, an expiry, permitted uses (with "cleared for" tags on images), and evidence upload to a private folder.
 - **People repository**: a list with search, a slide-out editor, and the images each person is tagged in. People can be linked to an Umbraco member and/or user.
-- **Deletion on request**: permanently delete a person's details and consent in one action. The audit log keeps an anonymised entry only.
+- **Subject access and deletion on request**: download everything held about a person as a zip, or permanently delete their details, consent and evidence in one action. The audit log keeps an anonymised entry only.
 - **Optional folder markers** (red or amber) when a folder contains images that cannot be used or need attention, also off by default.
 - **Select rows and export just those** from the overview. The Export button exports the ticked images, or everything matching the current filter when none are ticked.
 - **Bulk actions on ticked images:** mark them as having no people (images that already have someone tagged are left alone), or set or remove an expiry date on all of them. Each image is audited.
@@ -117,7 +117,8 @@ The package creates its own tables (`mgPerson`, `mgImage`, `mgImagePerson`, `mgA
 
 ## Known limitations
 
-- **Consent is only a yes or no.** The package does not store what was agreed, when, for how long, or a copy of the form. The audit log records who changed a consent and when.
+- **By default consent is only a yes or no.** Unless you switch on the optional detail, the package does not store what was agreed, when, for how long, or a copy of the form. The audit log records who changed a consent and when.
+- **Evidence storage.** Evidence is kept in a private folder of the media file system, which the package never serves. If your media is stored in a blob store or served from a CDN, set `EvidenceStoragePath` to a folder on disk instead.
 - **Signs on cards in the media grid are experimental.** The tree signs, coloured icons and folder markers are off by default. In the tree they work, but the card wrapper used for the grid view did not display cards when we registered it, so it is only added when `ShowStatusSigns` or `ShowFolderMarkers` is turned on, and that path has not been fixed or tested. Leave them off unless you are prepared to check the grid.
 - **Access is by user group.** Anyone in a configured group sees governance data for all images, including people's names and consent. Media start nodes are not applied.
 

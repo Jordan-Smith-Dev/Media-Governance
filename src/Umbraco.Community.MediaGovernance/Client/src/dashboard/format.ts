@@ -22,6 +22,14 @@ export function formatDate(iso: string | null): string {
     return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
 }
 
+export const GIVEN_BY_OPTIONS: { value: string; label: string }[] = [
+    { value: "Self", label: "The person themselves" },
+    { value: "ParentOrGuardian", label: "Parent or guardian" },
+    { value: "LegalRepresentative", label: "Legal representative" },
+];
+
+export const givenByLabel = (value: string | null) => GIVEN_BY_OPTIONS.find((o) => o.value === value)?.label ?? value ?? "";
+
 /** Whole days from today until an ISO date (negative when it has passed). */
 export function daysUntil(iso: string): number {
     const [y, m, d] = iso.split("-").map(Number);

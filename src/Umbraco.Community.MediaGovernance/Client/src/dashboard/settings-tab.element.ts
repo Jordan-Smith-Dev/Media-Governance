@@ -210,6 +210,12 @@ export class MediaGovernanceSettingsElement extends GovernanceElement {
                         <dd>${s.hideWithheldInPages ? "On: images that have expired, or whose people have not given consent, are left out of pages (using the <media-governance> tag helper)." : "Off: withheld images still show in pages."}</dd>
                         <dt>Block withheld image files</dt>
                         <dd>${s.blockWithheldFiles ? "On: the file of a withheld image returns a 404 to the public. Signed-in editors can still see it." : "Off: withheld images can still be reached by their address."}</dd>
+                        <dt>Consent detail</dt>
+                        <dd>
+                            ${[s.consentDetails ? "Date given and who gave it" : "", s.consentExpiry ? "Expiry" : "", s.consentEvidence ? "Evidence upload" : "", s.permittedUses.length > 0 ? `Permitted uses (${s.permittedUses.join(", ")})` : ""].filter(Boolean).map((t) => html`<uui-tag look="secondary">${t}</uui-tag> `)}
+                            ${!s.consentDetails && !s.consentExpiry && !s.consentEvidence && s.permittedUses.length === 0 ? "Off: consent is a yes or no on each person." : nothing}
+                        </dd>
+                        ${s.consentEvidence ? html`<dt>Evidence is kept in</dt><dd>${s.evidenceLocation}</dd>` : nothing}
                         <dt>Who can use Governance</dt>
                         <dd>${s.allowedUserGroups.length === 0 ? "No user groups." : s.allowedUserGroups.map((g) => html`<uui-tag look="secondary">${g}</uui-tag> `)}</dd>
                     </dl>

@@ -46,7 +46,13 @@ Everything starts in `appsettings.json`, under `Umbraco:Community:MediaGovernanc
         "ShowStatusSigns": false,
         "ColourTreeIcons": false,
         "ShowFolderMarkers": false,
-        "AllowedUserGroups": [ "sensitiveData" ]
+        "AllowedUserGroups": [ "sensitiveData" ],
+        "ConsentDetails": false,
+        "ConsentExpiry": false,
+        "ConsentEvidence": false,
+        "PermittedUses": [],
+        "EvidenceFolder": "governance-evidence",
+        "EvidenceStoragePath": null
       }
     }
   }
@@ -64,10 +70,29 @@ Everything starts in `appsettings.json`, under `Umbraco:Community:MediaGovernanc
 | `ColourTreeIcons` | `false` | Colours each image's icon in the tree by status | Not shown |
 | `ShowFolderMarkers` | `false` | A marker on folders that contain images needing attention | Not shown |
 | `AllowedUserGroups` | `sensitiveData` | Who can use Governance (section 2) | Read-only |
+| `ConsentDetails` | `false` | Record the date consent was given and who gave it (the person, a parent or guardian, a legal representative) | Read-only (see below) |
+| `ConsentExpiry` | `false` | Let a consent end on a date; after that the person's images are Expired | Read-only |
+| `ConsentEvidence` | `false` | Attach a signed form or email to a person's consent | Read-only |
+| `PermittedUses` | `[]` | The uses a consent can cover, for example `["Web", "Print", "Social"]`. Empty means consent is not recorded per use | Read-only |
+| `EvidenceFolder` | `governance-evidence` | Folder in Umbraco's media file system that holds evidence. Never served to the public | Read-only |
+| `EvidenceStoragePath` | none | Keep evidence in a folder on disk, outside the website, instead | Read-only |
 
 An override saved in the CMS is stored only when it differs from `appsettings.json`, so a value left at its starting point keeps following the file.
 
 **Changing the retention period affects existing images immediately, not only new ones.** Expiry dates are worked out from the retention period each time they are needed, so a new value re-dates every image that does not have its own expiry. Shortening it can make images Expired, and expired images are withheld from the website. The Settings tab warns about this before you save. Every settings change is written to the audit log with the old and new values (recipients are counted, never listed).
+
+### Optional consent detail
+
+By default consent is a **yes or no on the person**. Each of the switches below adds more to record, independently of the others, and they are all off. Turning one off later keeps what was recorded and just hides and ignores it, so it is safe to try them.
+
+- **`ConsentDetails`**: a *Given on* date (it can be a past date, such as the date on a paper form, but not a future one) and *Given by*: the person, a parent or guardian, or a legal representative. This is the evidence of who agreed and when, and of a child's consent being given by a parent (GDPR Art. 7(1) and Art. 8).
+- **`ConsentExpiry`**: an optional end date. Once it passes the person has **no consent in force**, so every image they are in becomes **Expired** immediately, and the People list and the image show "Consent expired". Renewing it is a normal edit and is audited.
+- **`PermittedUses`**: give a list and each consent must say which uses it covers (at least one). An image then shows which of those uses everyone pictured has agreed to ("Cleared for"). Consent has to be specific (Art. 4(11)); this is how to record it. The website tag helper still treats an image as usable or not, as a whole; it does not check a particular use.
+- **`ConsentEvidence`**: upload a signed form or email (PDF, PNG or JPG, up to 10 MB; the file contents are checked, not just its name) to a person's consent. It can be viewed, replaced or removed, and a history shows who uploaded, viewed or removed it. Deleting the person deletes their evidence.
+
+**Where evidence is kept, and why it is private.** By default evidence goes in a folder of its own, `governance-evidence`, inside Umbraco's media file system, named with random identifiers rather than anything from the upload. Umbraco serves `/media` publicly, so the package answers **404 for that whole folder to everyone, including signed-in users**; the files are only reachable through the Governance API, which needs a user in an allowed group, and every view is recorded. **If your media is stored in a blob store or served from a CDN** (for example Azure Blob Storage), that store can serve files by URL regardless of this package, so set `EvidenceStoragePath` to a folder on disk outside the website (relative paths start from the site's content root). On a load-balanced or container host, point it at persistent shared storage and include it in backups.
+
+**Subject access.** On any person, **Download their data** produces a zip: a JSON file with everything held about them (details, consent and its detail, the images they are tagged in, and who changed what and when), plus their evidence file if there is one. The download is itself recorded in the audit log.
 
 ### Email
 
@@ -98,8 +123,9 @@ For code, inject `IMediaGovernanceUsage` and call `IsUsableAsync(mediaKey)`. Det
 ## 5. Privacy
 
 - The audit log (`mgAudit`) records who changed what and when.
-- **Consent is a yes or no on the person.** Nothing else about it is stored: no uses, dates, expiry or evidence. Every change, and every settings change, is written to the audit log with who made it and when. That is the history of a consent.
-- **Deletion on request:** on the People tab, *Delete* permanently deletes a person's details and consent, and removes them from all images. The audit log keeps an anonymised entry only.
+- **Consent is a yes or no on the person**, unless you switch on the optional detail above (date given and by whom, expiry, permitted uses, evidence). Every consent change, evidence upload, view and removal, and every settings change, is written to the audit log with who made it and when. That is the history of a consent.
+- **Deletion on request:** on the People tab, *Delete* permanently deletes a person's details, consent and any evidence file, and removes them from all images. The audit log keeps an anonymised entry only.
+- **Subject access:** *Download their data* on a person gives everything held about them (see above).
 - Logs and the front-end service only ever contain media keys, statuses and page paths, never names or consent details.
 
 ## Develop

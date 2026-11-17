@@ -19,8 +19,11 @@ First version: Phase 1, media governance.
 - **Pages affected:** lists the pages that use withheld images, a page at a time, with a "+N" tooltip when a page has many.
 - Built with Umbraco's own components throughout (workspace, sidebar and dialog modals, `umb-input-date`, UUI tags and buttons) and checked in dark mode.
 
+- **Optional consent detail** (appsettings, all off by default, independent of each other): `ConsentDetails` (date given and who gave it), `ConsentExpiry` (an ended consent makes the person's images Expired immediately), `PermittedUses` (per-use consent with "cleared for" tags on images) and `ConsentEvidence` (signed form or email, 10 MB, PDF/PNG/JPG, checked by content). Evidence lives in a folder of its own in Umbraco's media file system that is never served (404 for everyone), or in a configured folder on disk (`EvidenceStoragePath`) for blob-store or CDN sites. Turning an option off keeps what was recorded and hides it.
+- **Download their data:** a zip with everything held about a person (JSON summary plus evidence), for subject access requests.
+
 Differences from the design prototype:
 
 - People are managed in the Governance page's *People* tab instead of a separate "Repositories" section.
-- Consent was designed as a record per person and image with permitted uses, dates and an evidence file. It was reduced to a yes or no on the person. The earlier version is kept on the branch `archive/detailed-consent`.
+- Consent was designed as a record per person and image with permitted uses, dates and an evidence file. The default is now a yes or no on the person, with the detail available as optional settings. The earlier version is kept on the branch `archive/detailed-consent`.
 - EXIF prefill of *Date taken* is offered as a suggestion on the image rather than filled in automatically.

@@ -37,7 +37,8 @@ test("Only retention, the warning window and recipients can be changed here", as
     await expect(settings.getByText("Set in appsettings (read-only)")).toBeVisible();
     await expect(settings.getByText("Hide withheld images in pages")).toBeVisible();
     await expect(settings.getByText("Block withheld image files")).toBeVisible();
-    await expect(settings.getByText("Permitted uses")).toHaveCount(0);
+    // Permitted uses and the other consent options are listed in the read-only box, never as something to edit.
+    await expect(settings.locator('uui-input[label="Permitted uses"], uui-textarea[label="Permitted uses"]')).toHaveCount(0);
     await expect(settings.getByText("Media tree")).toHaveCount(0);
     await expect(settings.getByText("Who can use Governance")).toBeVisible();
 });
