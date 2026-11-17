@@ -89,10 +89,10 @@ export class MediaGovernancePersonModalElement extends UmbModalBaseElement<Perso
         if (!person) return;
         try {
             await umbConfirmModal(this, {
-                headline: `Erase ${person.name}?`,
+                headline: `Delete ${person.name}?`,
                 content: "This permanently deletes this person's details and consent, and removes them from all images. It cannot be undone.",
                 color: "danger",
-                confirmLabel: "Erase permanently",
+                confirmLabel: "Delete",
             });
         } catch {
             return; // cancelled
@@ -100,7 +100,7 @@ export class MediaGovernancePersonModalElement extends UmbModalBaseElement<Perso
         try {
             await this.#api.erasePerson(person.id);
             this.#changed = true;
-            this.#notify("positive", "Person erased");
+            this.#notify("positive", "Person deleted");
             this.#close();
         } catch (e) {
             this.#notify("danger", errorMessage(e));
@@ -164,7 +164,7 @@ export class MediaGovernancePersonModalElement extends UmbModalBaseElement<Perso
                     : nothing}
 
                 <div slot="actions">
-                    ${person ? html`<uui-button class="action erase" look="primary" color="danger" label="Erase" @click=${this.#erase}>Erase</uui-button>` : nothing}
+                    ${person ? html`<uui-button class="action erase" look="primary" color="danger" label="Delete" @click=${this.#erase}>Delete</uui-button>` : nothing}
                     <uui-button class="action" look="secondary" label="Cancel" @click=${this._rejectModal}>Cancel</uui-button>
                     <uui-button class="action" look="primary" color="positive" label="Save" @click=${this.#save}>Save</uui-button>
                 </div>

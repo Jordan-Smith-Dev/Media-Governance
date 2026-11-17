@@ -126,6 +126,9 @@ export type Settings = {
     blockWithheldFiles: boolean;
     hideWithheldInPages: boolean;
     allowedUserGroups: string[];
+    /** Signs and folder markers on cards in the media grid (appsettings, off by default). */
+    showStatusSigns: boolean;
+    showFolderMarkers: boolean;
 };
 
 export type SettingsUpdate = {

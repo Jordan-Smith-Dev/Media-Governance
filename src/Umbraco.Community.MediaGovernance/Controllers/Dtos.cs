@@ -58,4 +58,6 @@ public record SettingsDto(
     IReadOnlyList<Guid> NotificationUserGroupIds,
     bool BlockWithheldFiles,
     bool HideWithheldInPages,
-    IReadOnlyList<string> AllowedUserGroups);
+    IReadOnlyList<string> AllowedUserGroups,
+    bool ShowStatusSigns = false,
+    bool ShowFolderMarkers = false);

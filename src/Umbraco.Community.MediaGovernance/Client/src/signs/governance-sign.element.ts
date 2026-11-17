@@ -69,6 +69,7 @@ export class MediaGovernanceSignElement extends UmbLitElement {
 }
 
 export default MediaGovernanceSignElement;
+export { MediaGovernanceSignElement as element };
 
 declare global {
     interface HTMLElementTagNameMap {

@@ -62,17 +62,17 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
     async #erase(person: Person) {
         try {
             await umbConfirmModal(this, {
-                headline: `Erase ${person.name}?`,
+                headline: `Delete ${person.name}?`,
                 content: "This permanently deletes this person's details and consent, and removes them from all images. It cannot be undone.",
                 color: "danger",
-                confirmLabel: "Erase permanently",
+                confirmLabel: "Delete",
             });
         } catch {
             return; // cancelled
         }
         try {
             await this.api.erasePerson(person.id);
-            this.notify("positive", "Person erased");
+            this.notify("positive", "Person deleted");
             await this.#load();
         } catch (e) {
             this.notify("danger", errorMessage(e));
@@ -124,7 +124,7 @@ export class MediaGovernancePeopleElement extends GovernanceElement {
                             <uui-table-cell class="actions">
                                 <div class="action-buttons">
                                     <uui-button class="action" look="secondary" label="Edit" @click=${() => this.#open(p)}>Edit</uui-button>
-                                    <uui-button class="action" look="primary" color="danger" label="Erase" @click=${() => this.#erase(p)}>Erase</uui-button>
+                                    <uui-button class="action" look="primary" color="danger" label="Delete" @click=${() => this.#erase(p)}>Delete</uui-button>
                                 </div>
                             </uui-table-cell>
                         </uui-table-row>

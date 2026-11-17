@@ -24,14 +24,14 @@ public class MediaGovernanceOptions
     /// <summary>When true (the default), the &lt;media-governance&gt; tag helper leaves withheld images out of pages.</summary>
     public bool HideWithheldInPages { get; set; } = true;
 
-    /// <summary>Status signs on images in the media tree and collection.</summary>
-    public bool ShowStatusSigns { get; set; } = true;
+    /// <summary>Status signs on images in the media tree and collection. Off by default, so the media tree looks like a normal Umbraco one.</summary>
+    public bool ShowStatusSigns { get; set; } = false;
 
-    /// <summary>Colour image icons in the media tree by status.</summary>
-    public bool ColourTreeIcons { get; set; } = true;
+    /// <summary>Colour image icons in the media tree by status. Off by default.</summary>
+    public bool ColourTreeIcons { get; set; } = false;
 
-    /// <summary>Red or amber marker on folders that contain images needing attention.</summary>
-    public bool ShowFolderMarkers { get; set; } = true;
+    /// <summary>Red or amber marker on folders that contain images needing attention. Off by default.</summary>
+    public bool ShowFolderMarkers { get; set; } = false;
 
     /// <summary>
     /// Aliases of the backoffice user groups allowed to use Governance. When empty, only the

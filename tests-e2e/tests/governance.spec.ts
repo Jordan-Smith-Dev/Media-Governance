@@ -90,3 +90,24 @@ test("Pages affected shows only a few images per page, with the rest behind a +N
     const counts = await page.locator("umb-media-governance-pages .images").evaluateAll((els) => els.map((e) => e.querySelectorAll("a.image").length));
     expect(Math.max(...counts)).toBeLessThanOrEqual(3);
 });
+
+test("By default the media tree and grid are plain Umbraco: nothing coloured, no signs, and every card shows", async ({ page }) => {
+    const icons: string[] = [];
+    page.on("response", async (r) => {
+        if (/\/tree\/media\/root/.test(r.url()) && r.ok()) {
+            const body = (await r.json().catch(() => null)) as { items?: { mediaType?: { icon?: string } }[] } | null;
+            for (const i of body?.items ?? []) if (i.mediaType?.icon) icons.push(i.mediaType.icon);
+        }
+    });
+    await page.goto("/umbraco/section/media");
+    await expect(page.getByText("Recycle Bin")).toBeVisible();
+    await page.getByText("Campus", { exact: true }).first().click();
+
+    // Umbraco's own card for each image in the folder (this was blank when our card wrapper was always registered).
+    await expect(page.locator("umb-media-collection-item-card")).toHaveCount(4);
+    await expect(page.locator("umb-media-governance-card")).toHaveCount(0);
+    // No signs next to anything, and no icon has been given a colour.
+    await expect(page.locator("umb-media-governance-sign")).toHaveCount(0);
+    expect(icons.length).toBeGreaterThan(0);
+    expect(icons.filter((i) => i.includes("color-")), "tree icons were coloured").toEqual([]);
+});

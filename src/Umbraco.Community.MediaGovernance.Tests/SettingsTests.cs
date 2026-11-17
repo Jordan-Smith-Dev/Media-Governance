@@ -52,15 +52,25 @@ public class SettingsServiceTests
     }
 
     [Fact]
-    public async Task Front_end_and_tree_options_cannot_be_changed_from_the_cms()
+    public async Task The_media_tree_is_left_as_normal_unless_appsettings_turns_the_extras_on()
     {
-        var app = new MediaGovernanceOptions { ShowStatusSigns = false, ColourTreeIcons = false, ShowFolderMarkers = false };
-        var sut = Sut(new FakeKeyValues(), app);
+        var off = await Sut(new FakeKeyValues()).GetAsync();
+        Assert.False(off.ShowStatusSigns);
+        Assert.False(off.ColourTreeIcons);
+        Assert.False(off.ShowFolderMarkers);
+
+        var on = await Sut(new FakeKeyValues(), new MediaGovernanceOptions { ShowStatusSigns = true, ColourTreeIcons = true, ShowFolderMarkers = true }).GetAsync();
+        Assert.True(on.ShowStatusSigns);
+        Assert.True(on.ColourTreeIcons);
+        Assert.True(on.ShowFolderMarkers);
+    }
+
+    [Fact]
+    public async Task Saving_settings_in_the_cms_does_not_change_the_media_tree_options()
+    {
+        var sut = Sut(new FakeKeyValues(), new MediaGovernanceOptions { ShowStatusSigns = true });
         await sut.SaveAsync(new SettingsUpdate(3, 90, []));
-        var o = await sut.GetAsync();
-        Assert.False(o.ShowStatusSigns);
-        Assert.False(o.ColourTreeIcons);
-        Assert.False(o.ShowFolderMarkers);
+        Assert.True((await sut.GetAsync()).ShowStatusSigns);
     }
 
     [Fact]

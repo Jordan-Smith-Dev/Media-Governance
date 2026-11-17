@@ -72,11 +72,11 @@ test("A tagged person on an image links to their record, which opens", async ({ 
     await expect(modal(page).getByRole("textbox", { name: "Name" })).toHaveValue("Tom Reyes");
 });
 
-test("Erase asks first, and cancelling keeps the person", async ({ page }) => {
+test("Delete asks first, and cancelling keeps the person", async ({ page }) => {
     await page.goto(view("people"));
     await page.getByRole("button", { name: "Tom Reyes" }).first().click();
-    await modal(page).locator('uui-button[label="Erase"]').click();
-    await expect(page.getByText("Erase Tom Reyes?")).toBeVisible();
+    await modal(page).locator('uui-button[label="Delete"]').click();
+    await expect(page.getByText("Delete Tom Reyes?")).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).last().click();
     await personFor(page, "Tom Reyes"); // still there
 });

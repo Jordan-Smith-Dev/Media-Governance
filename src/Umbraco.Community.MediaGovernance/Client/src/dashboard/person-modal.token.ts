@@ -7,7 +7,7 @@ export interface PersonModalData {
 }
 
 export interface PersonModalValue {
-    /** True when something was saved or erased, so the list needs reloading. */
+    /** True when something was saved or deleted, so the list needs reloading. */
     changed: boolean;
 }
 

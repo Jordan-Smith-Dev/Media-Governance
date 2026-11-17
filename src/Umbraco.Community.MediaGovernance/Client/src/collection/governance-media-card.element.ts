@@ -70,6 +70,7 @@ export class MediaGovernanceCardElement extends UmbLitElement {
 }
 
 export default MediaGovernanceCardElement;
+export { MediaGovernanceCardElement as element };
 
 declare global {
     interface HTMLElementTagNameMap {

@@ -43,9 +43,9 @@ Everything starts in `appsettings.json`, under `Umbraco:Community:MediaGovernanc
         "WarningDays": 90,
         "BlockWithheldMediaFiles": true,
         "HideWithheldInPages": true,
-        "ShowStatusSigns": true,
-        "ColourTreeIcons": true,
-        "ShowFolderMarkers": true,
+        "ShowStatusSigns": false,
+        "ColourTreeIcons": false,
+        "ShowFolderMarkers": false,
         "AllowedUserGroups": [ "sensitiveData" ]
       }
     }
@@ -60,9 +60,9 @@ Everything starts in `appsettings.json`, under `Umbraco:Community:MediaGovernanc
 | Notification recipients | none | Email addresses and user groups that get the daily digest | **Edited** in Governance, Settings |
 | `HideWithheldInPages` | `true` | The `<media-governance>` tag helper leaves out images that are Expired or have no consent. `false`: they still show, and are still logged | Read-only |
 | `BlockWithheldMediaFiles` | `true` | Requests for the file of a withheld image return 404 to the public (signed-in editors can still see it). `false`: only pages are affected | Read-only |
-| `ShowStatusSigns` | `true` | Status signs on images in the media tree and collection | Not shown |
-| `ColourTreeIcons` | `true` | Colours each image's icon in the tree by status | Not shown |
-| `ShowFolderMarkers` | `true` | A marker on folders that contain images needing attention | Not shown |
+| `ShowStatusSigns` | `false` | Status signs on images in the media tree and collection. Off, so the tree looks like a normal Umbraco one | Not shown |
+| `ColourTreeIcons` | `false` | Colours each image's icon in the tree by status | Not shown |
+| `ShowFolderMarkers` | `false` | A marker on folders that contain images needing attention | Not shown |
 | `AllowedUserGroups` | `sensitiveData` | Who can use Governance (section 2) | Read-only |
 
 An override saved in the CMS is stored only when it differs from `appsettings.json`, so a value left at its starting point keeps following the file.
@@ -99,7 +99,7 @@ For code, inject `IMediaGovernanceUsage` and call `IsUsableAsync(mediaKey)`. Det
 
 - The audit log (`mgAudit`) records who changed what and when.
 - **Consent is a yes or no on the person.** Nothing else about it is stored: no uses, dates, expiry or evidence. Every change, and every settings change, is written to the audit log with who made it and when. That is the history of a consent.
-- **Erasure:** on the People tab, *Erase* permanently deletes a person's details and consent, and removes them from all images. The audit log keeps an anonymised entry only.
+- **Deletion on request:** on the People tab, *Delete* permanently deletes a person's details and consent, and removes them from all images. The audit log keeps an anonymised entry only.
 - Logs and the front-end service only ever contain media keys, statuses and page paths, never names or consent details.
 
 ## Develop

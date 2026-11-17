@@ -17,6 +17,12 @@ const signs: Array<{ status: string; label: string; icon: string; color: string 
 
 export const manifests: Array<UmbExtensionManifest> = [
     {
+        type: "backofficeEntryPoint",
+        alias: `${ID}.EntryPoint`,
+        name: "Media Governance Entry Point",
+        js: () => import("./entry-point.js"),
+    },
+    {
         // The Governance page: one workspace (like the Log Viewer) whose views are the header tabs.
         type: "workspace",
         alias: GOVERNANCE_WORKSPACE_ALIAS,
@@ -68,15 +74,6 @@ export const manifests: Array<UmbExtensionManifest> = [
             menus: ["Umb.Menu.Media"],
         },
         conditions: [{ alias: "Umb.Condition.SectionAlias", match: "Umb.Section.Media" }],
-    },
-    {
-        // Umbraco's media card in the grid view shows no signs, so ours wraps it and adds them
-        type: "entityCollectionItemCard",
-        alias: `${ID}.MediaCard`,
-        name: "Media Governance Media Card",
-        element: () => import("./collection/governance-media-card.element.js"),
-        weight: 100,
-        forEntityTypes: ["media"],
     },
     {
         type: "workspaceView",

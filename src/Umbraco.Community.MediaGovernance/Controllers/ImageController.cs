@@ -123,7 +123,8 @@ public class ImageController(
         settings.AppSettings.RetentionYears, settings.AppSettings.WarningDays,
         o.NotificationEmails, o.NotificationUserGroupIds ?? [],
         o.BlockWithheldFiles, o.HideWithheldInPages,
-        access.AllowedGroups);
+        access.AllowedGroups,
+        o.ShowStatusSigns, o.ShowFolderMarkers);
 
     private async Task<ImageGovernanceDto> BuildAsync(Guid mediaKey)
     {

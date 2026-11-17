@@ -24,9 +24,9 @@ public record GovernanceOptions(
     IReadOnlyList<Guid>? NotificationUserGroupIds = null,
     bool BlockWithheldFiles = true,
     bool HideWithheldInPages = true,
-    bool ShowStatusSigns = true,
-    bool ColourTreeIcons = true,
-    bool ShowFolderMarkers = true)
+    bool ShowStatusSigns = false,
+    bool ColourTreeIcons = false,
+    bool ShowFolderMarkers = false)
 {
     public GovernanceSettings ToCore() => new(RetentionYears, WarningDays);
 
