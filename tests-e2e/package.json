@@ -9,7 +9,7 @@
     "screenshots": "node screenshots.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "1.49.1",
+    "@playwright/test": "1.65.1",
     "@types/node": "^22.0.0"
   }
 }
