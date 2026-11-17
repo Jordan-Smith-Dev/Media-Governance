@@ -45,6 +45,14 @@ test("An expired image shows an Expired tag beside its Expiry", async ({ page })
     await expect(page.locator("umb-media-governance-image-view .expiry uui-tag")).toContainText("Expired");
 });
 
+test("An image still in date shows how long is left in a green pill, like Expired is red", async ({ page }) => {
+    await openGovernance(page, "Library exterior");
+    const tag = page.locator("umb-media-governance-image-view .expiry uui-tag");
+    await expect(tag).toHaveText(/^in \d+ /);
+    await expect(tag).toHaveAttribute("color", "positive");
+    await expect(tag).toHaveAttribute("look", "primary");
+});
+
 test("Choosing a different Expiry stores it, and choosing the calculated date goes back to the retention period", async ({ page }) => {
     test.setTimeout(90_000);
     const key = await mediaKeyFor(page, "Library exterior");

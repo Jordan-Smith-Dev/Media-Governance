@@ -198,8 +198,11 @@ export class MediaGovernanceImageViewElement extends GovernanceElement {
     #renderExpiredIndicator(d: ImageGovernance) {
         if (!d.effectiveExpiry) return nothing;
         const days = daysUntil(d.effectiveExpiry);
-        if (days > 0) return html`<span class="muted">${relativeTime(days)}</span>`;
-        return html`<uui-tag color="danger" look="primary" title="The expiry date has passed. Do not use this image.">Expired ${days === 0 ? "today" : relativeTime(days)}</uui-tag>`;
+        if (days <= 0) return html`<uui-tag color="danger" look="primary" title="The expiry date has passed. Do not use this image.">Expired ${days === 0 ? "today" : relativeTime(days)}</uui-tag>`;
+        // Same pill as Expired: amber when it is inside the warning window, green otherwise.
+        return d.issues.includes("ExpiringSoon")
+            ? html`<uui-tag color="warning" look="primary" title="This image is inside the warning window before it expires.">${relativeTime(days)}</uui-tag>`
+            : html`<uui-tag color="positive" look="primary" title="Still within its retention period.">${relativeTime(days)}</uui-tag>`;
     }
 
     #renderPeoplePicker(d: ImageGovernance) {
