@@ -53,7 +53,7 @@ test("The consent options show once consent is ticked, and uses are required", a
 
     // Saving without a use is refused and nothing is recorded.
     await m.locator('uui-button[label="Save"]').click();
-    await expect(page.getByText("Choose at least one permitted use.").first()).toBeVisible();
+    await expect(m.getByText("Choose at least one permitted use.")).toBeVisible();
     expect((await person(page, p.id)).consentGiven).toBe(false);
     } finally {
         await api(page, "DELETE", `people/${p.id}`);
@@ -153,11 +153,12 @@ test("Evidence can be uploaded, viewed, listed in its history and removed, and i
         await page.getByRole("button", { name: p.name }).first().click();
         const m = modal(page);
         await expect(m.locator("uui-file-dropzone")).toBeVisible();      // the dropzone is the empty state
+        await expect(m.getByText("Click to upload")).toBeVisible();      // Umbraco's own wording
         await expect(m.locator("uui-ref-node.evidence-line")).toHaveCount(0);
         await expect(m.getByText(/Kept in: Media folder "governance-evidence" \(never served to the public\)/)).toBeVisible();
 
         await m.locator('input[type="file"]').setInputFiles(PDF);
-        await expect(page.getByText("Evidence uploaded").first()).toBeVisible();
+        await expect(modal(page).getByText("Evidence uploaded")).toBeVisible();
         await expect(m.locator('uui-ref-node[name^="PDF"]')).toBeVisible();
         expect((await person(page, p.id)).hasEvidence).toBe(true);
 
@@ -187,11 +188,36 @@ test("A file that is not a real PDF, PNG or JPG is refused", async ({ page }) =>
         await page.goto(view("people"));
         await page.getByRole("button", { name: p.name }).first().click();
         await modal(page).locator('input[type="file"]').setInputFiles({ name: "form.pdf", mimeType: "application/pdf", buffer: Buffer.from("this is not a pdf") });
-        await expect(page.getByText(/do not match its type/).first()).toBeVisible();
+        await expect(modal(page).getByText(/do not match its type/)).toBeVisible();
         expect((await person(page, p.id)).hasEvidence).toBe(false);
     } finally {
         await api(page, "DELETE", `people/${p.id}`);
     }
+});
+
+test("A message inside the modal can be dismissed (Umbraco's toasts cannot be reached while a modal is open)", async ({ page }) => {
+    const p = await create(page, `E2E Message ${Date.now()}`);
+    try {
+        await page.goto(view("people"));
+        await page.getByRole("button", { name: p.name }).first().click();
+        const m = modal(page);
+        await m.locator('input[type="file"]').setInputFiles({ name: "form.pdf", mimeType: "application/pdf", buffer: Buffer.from("this is not a pdf") });
+        const message = m.locator(".message.danger");
+        await expect(message).toContainText("do not match its type");
+        await message.locator("uui-button").click();
+        await expect(message).toHaveCount(0);
+    } finally {
+        await api(page, "DELETE", `people/${p.id}`);
+    }
+});
+
+test("The tagged images are a table, like the history", async ({ page }) => {
+    await page.goto(view("people"));
+    await page.getByRole("button", { name: "Tom Reyes" }).first().click();
+    const table = modal(page).locator("uui-table.images");
+    await expect(table).toBeVisible();
+    for (const head of ["Image", "Folder", "Status"]) await expect(table.locator("uui-table-head-cell", { hasText: head })).toBeVisible();
+    await expect(table.locator("uui-table-row", { hasText: "Lecture theatre" }).locator("uui-tag.pill")).toBeVisible();
 });
 
 test("The evidence folder in the media area is never served, even to a signed-in user", async ({ page }) => {
@@ -207,7 +233,7 @@ test("Deleting a person also deletes their evidence", async ({ page }) => {
     await page.goto(view("people"));
     await page.getByRole("button", { name: p.name }).first().click();
     await modal(page).locator('input[type="file"]').setInputFiles(PDF);
-    await expect(page.getByText("Evidence uploaded").first()).toBeVisible();
+    await expect(modal(page).getByText("Evidence uploaded")).toBeVisible();
     await modal(page).locator('uui-button[label="Delete"]').click();
     await page.getByRole("button", { name: "Delete" }).last().click();
     await expect(page.getByText("Person deleted").first()).toBeVisible();
@@ -223,7 +249,7 @@ test("Download their data gives a zip with everything held about the person", as
         await page.goto(view("people"));
         await page.getByRole("button", { name: p.name }).first().click();
         await modal(page).locator('input[type="file"]').setInputFiles(PDF);
-        await expect(page.getByText("Evidence uploaded").first()).toBeVisible();
+        await expect(modal(page).getByText("Evidence uploaded")).toBeVisible();
 
         const [download] = await Promise.all([page.waitForEvent("download"), modal(page).locator('uui-button[label="Download their data"]').click()]);
         expect(download.suggestedFilename()).toMatch(/^person-data-e2e-export-\d+\.zip$/);
