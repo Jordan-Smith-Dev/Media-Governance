@@ -11,12 +11,14 @@
     <Product>Umbraco.Community.MediaGovernance</Product>
     <PackageId>Umbraco.Community.MediaGovernance</PackageId>
     <Title>Media Governance</Title>
-    <Description>Governs images in the Umbraco media library: tag the people pictured, record per-image consent, and track expiry and compliance from a Media section dashboard.</Description>
+    <Description>Know which images in the Umbraco media library you can use. Tag the people pictured, record whether each person has given consent, and flag images that are expiring or lack consent from a Governance page in the Media section. Withheld images can be hidden from pages and blocked from the public.</Description>
     <PackageTags>umbraco;umbraco-marketplace;media;consent;gdpr;governance;compliance</PackageTags>
     <Authors>Jordan Smith</Authors>
     <Copyright>$([System.DateTime]::UtcNow.ToString(`yyyy`)) © Jordan Smith</Copyright>
     <PackageReadmeFile>README_nuget.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/Jordan-Smith-Dev/Media-Governance</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/Jordan-Smith-Dev/Media-Governance</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Version>0.1.0</Version>
     <!-- Ship the Core assembly inside this package instead of as a separate NuGet dependency -->

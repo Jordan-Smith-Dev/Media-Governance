@@ -12,3 +12,4 @@ src/*.TestSite/wwwroot/media/
 src/Umbraco.Community.MediaGovernance/wwwroot/
 site.log
 *.log
+artifacts/

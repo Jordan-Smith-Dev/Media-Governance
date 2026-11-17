@@ -142,6 +142,15 @@ To send through a real mail server instead, replace the `Smtp` block in `appsett
 
 If no file appears: check that a recipient is saved, that `mgNotified` was emptied, that some image is Expired, No consent, Needs tagging or Expiring soon, and look for warnings in the site log.
 
+**Pack for NuGet / the Umbraco Marketplace.** The backoffice files are built, not committed, so build them before packing:
+
+```
+cd src/Umbraco.Community.MediaGovernance/Client && npm ci && npm run build
+cd ../../.. && dotnet pack src/Umbraco.Community.MediaGovernance/Umbraco.Community.MediaGovernance.csproj -c Release -o artifacts
+```
+
+The `.nupkg` contains the package and Core assemblies, the built `App_Plugins` files and `docs/README_nuget.md`. The Marketplace listing comes from `umbraco-marketplace.json` and the `umbraco-marketplace` NuGet tag.
+
 **Tests**
 
 ```
