@@ -1,0 +1,52 @@
+name: Publish to NuGet
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # lets the job request a short-lived NuGet token (Trusted Publishing)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/Umbraco.Community.MediaGovernance/Client/package-lock.json
+
+      - name: Build the backoffice client
+        working-directory: src/Umbraco.Community.MediaGovernance/Client
+        run: |
+          npm ci
+          npm run build
+
+      - name: Test
+        run: dotnet test src/Umbraco.Community.MediaGovernance.Tests -c Release
+
+      - name: Pack
+        run: dotnet pack src/Umbraco.Community.MediaGovernance -c Release -o artifacts
+
+      - name: Check the tag matches the package version
+        run: |
+          nupkg=$(ls artifacts/*.nupkg)
+          echo "Packed $nupkg for tag $GITHUB_REF_NAME"
+          [[ "$nupkg" == *".${GITHUB_REF_NAME#v}.nupkg" ]] || { echo "Tag and <Version> differ"; exit 1; }
+
+      - name: Get a short-lived NuGet key
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }} # your nuget.org profile name (not email)
+
+      - name: Push
+        run: dotnet nuget push artifacts/*.nupkg --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
