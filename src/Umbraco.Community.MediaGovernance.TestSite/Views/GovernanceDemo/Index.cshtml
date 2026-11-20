@@ -1,0 +1,34 @@
+@model IReadOnlyList<ImageInfo>
+@inject IMediaGovernanceUsage Governance
+@{
+    // One lookup for the whole gallery, rather than one per image.
+    var usable = await Governance.GetUsableAsync(Model.Select(i => i.Key).ToList());
+}
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Governance demo</title></head>
+<body>
+<h1>Gallery</h1>
+<p>Rendered with <code>&lt;media-governance&gt;</code>: expired images and images without consent are left out.</p>
+<ul id="gallery">
+    @foreach (var image in Model)
+    {
+        <media-governance key="@image.Key">
+            <li data-shown="true">@image.Name</li>
+        </media-governance>
+    }
+</ul>
+
+<h2>Withheld</h2>
+<ul id="withheld">
+    @foreach (var image in Model)
+    {
+        <media-governance key="@image.Key" show="Unusable">
+            <li data-shown="false">@image.Name (no longer available)</li>
+        </media-governance>
+    }
+</ul>
+
+<p id="summary">Usable: @usable.Count(u => u.Value) of @usable.Count (from the service)</p>
+</body>
+</html>

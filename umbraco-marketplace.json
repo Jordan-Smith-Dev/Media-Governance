@@ -1,0 +1,13 @@
+{
+  "$schema": "https://marketplace.umbraco.com/umbraco-marketplace-schema.json",
+  "AuthorDetails": {
+    "Name": "Jordan Smith",
+    "ImageUrl": "https://github.com/Jordan-Smith-Dev.png"
+  },
+  "Category": "Backoffice",
+  "Description": "Know which images in the media library you can use. Tag the people pictured, record whether each person has given consent, and flag images that are expiring or lack consent, with no UI Builder dependency.",
+  "LicenseTypes": [ "Free" ],
+  "PackageType": "Package",
+  "Tags": [ "umbraco", "media", "consent", "gdpr", "compliance", "governance", "backoffice" ],
+  "Title": "Media Governance for Umbraco"
+}

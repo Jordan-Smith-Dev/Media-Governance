@@ -1,0 +1,15 @@
+{
+  "$schema": "../../umbraco-package-schema.json",
+  "id": "Umbraco.Community.MediaGovernance",
+  "name": "Umbraco.Community.MediaGovernance",
+  "version": "0.1.0",
+  "allowTelemetry": true,
+  "extensions": [
+    {
+      "name": "Media Governance Bundle",
+      "alias": "Umbraco.Community.MediaGovernance.Bundle",
+      "type": "bundle",
+      "js": "/App_Plugins/UmbracoCommunityMediaGovernance/umbraco-community-media-governance.js"
+    }
+  ]
+}

@@ -1,0 +1,333 @@
+import { umbHttpClient } from "@umbraco-cms/backoffice/http-client";
+
+const API_BASE = "/umbraco/umbracocommunitymediagovernance/api/v1";
+
+export type GovernanceStatus = "Compliant" | "ExpiringSoon" | "Expired" | "NoConsent" | "NeedsTagging";
+
+export const STATUS_LABELS: Record<GovernanceStatus, string> = {
+  Compliant: "Compliant",
+  ExpiringSoon: "Expiring soon",
+  Expired: "Expired",
+  NoConsent: "No consent",
+  NeedsTagging: "Needs tagging",
+};
+
+/** Plain-language meaning of each status, shown as a tooltip wherever a status appears. */
+export const STATUS_HELP: Record<GovernanceStatus, string> = {
+  Compliant: "Everything needed is in place: nobody is pictured, or everyone pictured has given consent, and the image is within its retention period.",
+  ExpiringSoon: "Still usable, but the retention period runs out within the warning window.",
+  Expired: "The retention period has ended. Do not use this image.",
+  NoConsent: "People are tagged in the image, but at least one has not given consent.",
+  NeedsTagging: "Nobody has been tagged yet. Tag the people pictured, or mark that the image contains no people.",
+};
+
+export type OverviewSort = "Name" | "Folder" | "DateTaken" | "Expiry" | "Status";
+
+export type ExpirySource = "None" | "Default" | "Custom" | "Consent";
+
+export type OverviewItem = {
+  mediaKey: string;
+  name: string;
+  folder: string;
+  people: string[];
+  dateTaken: string | null;
+  expiry: string | null;
+  daysToExpiry: number | null;
+  consent: string;
+  status: GovernanceStatus;
+  expirySource: ExpirySource;
+  issues: GovernanceStatus[];
+  noPeople: boolean;
+};
+
+export type OverviewPage = {
+  counts: Record<GovernanceStatus, number>;
+  allCount: number;
+  items: OverviewItem[];
+  total: number;
+};
+
+export type Person = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  linkedMemberKey: string | null;
+  linkedUserKey: string | null;
+  jobTitle: string | null;
+  taggedInCount: number;
+  /** Whether the person has given consent to appear in images. */
+  consentGiven: boolean;
+  consentUpdatedUtc: string | null;
+  /** Given and, if expiry is on, not run out. Pills and tags use this. */
+  consentInForce: boolean;
+  /** Given, but its end date has passed. */
+  consentExpired: boolean;
+  /** Optional detail: each is null unless its option is switched on. */
+  consentGivenOn: string | null;
+  consentGivenBy: string | null;
+  consentExpiresOn: string | null;
+  consentPermittedUses: string[] | null;
+  hasEvidence: boolean;
+  evidenceType: string | null;
+  evidenceSizeBytes: number | null;
+};
+
+export type PersonRequest = Pick<Person, "name" | "email" | "phone" | "linkedMemberKey" | "linkedUserKey" | "jobTitle">;
+
+/** What to record for a person's consent. Detail is only used while its option is switched on. */
+export type ConsentChange = {
+  given: boolean;
+  givenOn?: string | null;
+  givenBy?: string | null;
+  expiresOn?: string | null;
+  permittedUses?: string[] | null;
+};
+
+export type EvidenceEvent = { action: string; whenUtc: string; actor: string };
+
+/** One page of people. `total` is how many match, so the screen can offer "load more". */
+export type PeoplePage = { items: Person[]; total: number };
+export type PersonImagesPage = { items: PersonImage[]; total: number };
+
+/** A person tagged on an image, with whether they have given consent. */
+export type TaggedPerson = { personId: string; name: string; consentGiven: boolean; consentExpired: boolean };
+
+/** An image a person is tagged in. */
+export type PersonImage = { mediaKey: string; name: string; folder: string; status: GovernanceStatus };
+
+
+export type ImageGovernance = {
+  mediaKey: string;
+  dateTaken: string | null;
+  dateObtained: string | null;
+  customExpiry: string | null;
+  noPeople: boolean;
+  taggedPersonIds: string[];
+  effectiveExpiry: string | null;
+  /** The expiry worked out from retention, ignoring any custom date. */
+  defaultExpiry: string | null;
+  expirySource: ExpirySource;
+  status: GovernanceStatus;
+  issues: GovernanceStatus[];
+  /** The people tagged on this image, with their consent. */
+  people: TaggedPerson[];
+  /** The uses everyone pictured has agreed to. Empty unless permitted uses are configured. */
+  clearedUses: string[];
+  dateUploaded: string | null;
+  /** Date found in the photo's camera data; only sent while Date taken is empty. */
+  exifDateTaken?: string | null;
+};
+
+export type ImageGovernanceRequest = Pick<
+  ImageGovernance,
+  "dateTaken" | "dateObtained" | "customExpiry" | "noPeople" | "taggedPersonIds"
+>;
+
+export type BulkImageChange = { noPeople?: boolean; customExpiry?: string | null; clearCustomExpiry?: boolean };
+export type BulkImageResult = { updated: number; skipped: number };
+
+export type AffectedImage = { mediaKey: string; name: string; status: GovernanceStatus };
+
+export type AffectedPage = {
+  pageKey: string;
+  name: string;
+  published: boolean;
+  contentType: string | null;
+  contentTypeIcon: string | null;
+  images: AffectedImage[];
+};
+
+/** What the Settings screen shows. Only retention, the warning window and recipients can be changed here; the rest comes from appsettings. */
+export type Settings = {
+  retentionYears: number;
+  warningDays: number;
+  /** The appsettings values behind retention and the warning window. */
+  defaultRetentionYears: number;
+  defaultWarningDays: number;
+  notificationEmails: string[];
+  notificationUserGroupIds: string[];
+  /** Read-only (appsettings). */
+  blockWithheldFiles: boolean;
+  hideWithheldInPages: boolean;
+  allowedUserGroups: string[];
+  /** Signs and folder markers on cards in the media grid (appsettings, off by default). */
+  showStatusSigns: boolean;
+  showFolderMarkers: boolean;
+  /** Optional consent detail (appsettings, all off by default). */
+  consentDetails: boolean;
+  consentExpiry: boolean;
+  consentEvidence: boolean;
+  permittedUses: string[];
+  /** Where evidence is kept, in words, when evidence is on. */
+  evidenceLocation: string | null;
+  /** Only sent to admins, and only while admin settings are switched on in appsettings. */
+  adminSettings?: AdminSettings | null;
+};
+
+/** The settings an admin can change in the CMS. */
+export type AdminValues = {
+  blockWithheldFiles: boolean;
+  hideWithheldInPages: boolean;
+  showStatusSigns: boolean;
+  colourTreeIcons: boolean;
+  showFolderMarkers: boolean;
+  consentDetails: boolean;
+  consentExpiry: boolean;
+  consentEvidence: boolean;
+  permittedUses: string[];
+};
+
+/** What is in force, and what appsettings says, so a change can be marked and reset. */
+export type AdminSettings = { current: AdminValues; defaults: AdminValues };
+
+export type SettingsUpdate = {
+  retentionYears: number;
+  warningDays: number;
+  notificationEmails: string[];
+  notificationUserGroupIds: string[];
+};
+
+export type UserGroup = { id: string; name: string };
+
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+/**
+  * Talks to this package's Management API controllers through Umbraco's own HTTP client, the same way Umbraco's
+  * generated SDK calls do. That client already handles sign-in (cookie or token), token refresh and 401 retries,
+  * so nothing here deals with tokens.
+  */
+export class GovernanceApi {
+  async #request(
+    method: "GET" | "POST" | "PUT" | "DELETE",
+    path: string,
+    options: { body?: unknown; form?: FormData; parseAs?: "json" | "blob" | "text" } = {}
+  ): Promise<unknown> {
+    const result = (await (umbHttpClient as any).request({
+      method,
+      url: `${API_BASE}/${path}`,
+      // Declaring a bearer scheme is what makes the client attach the backoffice credentials.
+      security: [{ type: "http", scheme: "bearer" }],
+      throwOnError: false,
+      parseAs: options.parseAs ?? "auto",
+      ...(options.form
+        ? { body: options.form, bodySerializer: null, headers: { "Content-Type": null } }
+        : options.body !== undefined
+          ? { body: options.body, headers: { "Content-Type": "application/json" } }
+          : {}),
+    })) as { data?: unknown; error?: unknown; response?: Response };
+
+    const response = result.response;
+    if (!response || !response.ok) {
+      const err = result.error;
+      const message =
+        typeof err === "string" && err
+          ? err
+          : ((err as { detail?: string; title?: string } | undefined)?.detail ??
+            (err as { title?: string } | undefined)?.title ??
+            `Request failed (${response?.status ?? "no response"})`);
+      throw new ApiError(response?.status ?? 0, message);
+    }
+    return result.data;
+  }
+
+  async #json<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
+    return (await this.#request(method, path, { body })) as T;
+  }
+
+  overview(status: GovernanceStatus | null, filter: string, skip: number, take: number, sort: OverviewSort = "Name", desc = false) {
+    const q = new URLSearchParams({ skip: String(skip), take: String(take), sort, desc: String(desc) });
+    if (status) q.set("status", status);
+    if (filter) q.set("filter", filter);
+    return this.#json<OverviewPage>("GET", `overview?${q}`);
+  }
+
+  async exportCsv(status: GovernanceStatus | null, filter: string, keys?: string[], sort: OverviewSort = "Name", desc = false): Promise<void> {
+    const q = new URLSearchParams({ sort, desc: String(desc) });
+    if (status) q.set("status", status);
+    if (filter) q.set("filter", filter);
+    const blob = (await this.#request("GET", `overview/export?${q}${keys?.length ? `&keys=${keys.join(",")}` : ""}`, { parseAs: "blob" })) as Blob;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "media-governance.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  people(query = "", skip = 0, take = 50) {
+    return this.#json<PeoplePage>("GET", `people?q=${encodeURIComponent(query)}&skip=${skip}&take=${take}`);
+  }
+  createPerson(p: PersonRequest) {
+    return this.#json<Person>("POST", "people", p);
+  }
+  updatePerson(id: string, p: PersonRequest) {
+    return this.#json<Person>("PUT", `people/${id}`, p);
+  }
+  async erasePerson(id: string): Promise<void> {
+    await this.#request("DELETE", `people/${id}`);
+  }
+
+  image(mediaKey: string) {
+    return this.#json<ImageGovernance>("GET", `image/${mediaKey}`);
+  }
+  saveImage(mediaKey: string, r: ImageGovernanceRequest) {
+    return this.#json<ImageGovernance>("PUT", `image/${mediaKey}`, r);
+  }
+  bulkImages(mediaKeys: string[], change: BulkImageChange) {
+    return this.#json<BulkImageResult>("POST", "images/bulk", { mediaKeys, noPeople: false, clearCustomExpiry: false, ...change });
+  }
+
+  setConsent(personId: string, change: ConsentChange) {
+    return this.#json<Person>("PUT", `people/${personId}/consent`, change);
+  }
+  /** Fetches the evidence with the backoffice credentials. Each call is audited as a view. */
+  async evidence(personId: string): Promise<Blob> {
+    return (await this.#request("GET", `people/${personId}/evidence`, { parseAs: "blob" })) as Blob;
+  }
+  evidenceHistory(personId: string) {
+    return this.#json<EvidenceEvent[]>("GET", `people/${personId}/evidence/history`);
+  }
+  async removeEvidence(personId: string): Promise<Person> {
+    return (await this.#request("DELETE", `people/${personId}/evidence`)) as Person;
+  }
+  async uploadEvidence(personId: string, file: File): Promise<Person> {
+    const form = new FormData();
+    form.append("file", file);
+    return (await this.#request("POST", `people/${personId}/evidence`, { form })) as Person;
+  }
+  /** Everything held about the person, as a zip, for a subject access request. */
+  async exportPerson(personId: string, fileName: string): Promise<void> {
+    const blob = (await this.#request("GET", `people/${personId}/export`, { parseAs: "blob" })) as Blob;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  personImages(personId: string, skip = 0, take = 25) {
+    return this.#json<PersonImagesPage>("GET", `people/${personId}/images?skip=${skip}&take=${take}`);
+  }
+
+  pagesAffected() {
+    return this.#json<AffectedPage[]>("GET", "pages-affected");
+  }
+
+  settings() {
+    return this.#json<Settings>("GET", "settings");
+  }
+  userGroups() {
+    return this.#json<UserGroup[]>("GET", "user-groups");
+  }
+  saveSettings(s: SettingsUpdate) {
+    return this.#json<Settings>("PUT", "settings", s);
+  }
+  saveAdminSettings(v: AdminValues) {
+    return this.#json<Settings>("PUT", "settings/admin", v);
+  }
+}
